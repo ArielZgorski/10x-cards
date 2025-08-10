@@ -1,0 +1,84 @@
+---
+description: Migration summary aligning schema to ai/db-plan.md
+globs:
+  - supabase/migrations/*.sql
+alwaysApply: false
+---
+
+# Supabase migration overview (aligned with ai/db-plan.md)
+
+This document summarizes the database schema implemented in `supabase/migrations/20250803090131_create_flashcard_tables.sql`, updated to align with `ai/db-plan.md`.
+
+## Tables
+
+- profiles
+  - 1:1 with `auth.users` via `profiles.id`
+  - Columns: `display_name`, `timezone`, `locale`, `created_at`, `updated_at`
+  - RLS: owner-only on `id = auth.uid()`
+
+- decks
+  - Columns: `user_id`, `name`, `slug`, `language_code`, `is_archived`, timestamps
+  - Constraints: `unique(user_id, slug)`
+  - Indexes: `(user_id)`
+  - RLS: owner-only on `user_id = auth.uid()`
+
+- cards
+  - Columns: `user_id`, `deck_id`, `front`, `back`, `source ('manual'|'ai')`, `is_archived`, `language_code`, SR fields: `due_at`, `last_reviewed_at`, `repetitions_count`, `lapses_count`, `ease_factor`, `interval_days`, timestamps
+  - Indexes: `(user_id)`, `(deck_id)`, `(user_id, is_archived, due_at)`
+  - Optional unique: `(user_id, deck_id, lower(front), lower(back))` (commented in SQL)
+  - RLS: owner-only on `user_id = auth.uid()`
+
+- reviews
+  - Columns: `user_id`, `card_id`, `reviewed_at`, `rating 0..3`, optional `duration_ms`, pre/post snapshots of SR metrics; optional FSRS fields
+  - Indexes: `(card_id, reviewed_at)`, `(user_id, reviewed_at)`
+  - RLS: owner-only on `user_id = auth.uid()`
+
+- ai_generations
+  - Columns: `user_id`, `source_text(1000..10000)`, `model`, `prompt_version`, token and cost counters, `status`, `error jsonb`, `ai_metadata jsonb`, timestamps
+  - Indexes: `(user_id, created_at)`
+  - RLS: owner-only on `user_id = auth.uid()`
+
+- ai_suggestions
+  - Columns: `user_id`, `generation_id`, `front`, `back`, `status('proposed'|'edited'|'accepted'|'rejected')`, `accepted_at`, optional `card_id`, timestamps
+  - Indexes: `(user_id, status)`, `(generation_id)`, `(card_id)`
+  - RLS: owner-only on `user_id = auth.uid()`
+
+- study_sessions (optional)
+  - Columns: `user_id`, `started_at`, `ended_at`, `notes`, timestamps
+  - Indexes: `(user_id, started_at)`
+  - RLS: owner-only on `user_id = auth.uid()`
+
+## Policies & RLS
+
+- RLS enabled on all user tables
+- Owner-only policies: `USING (user_id = auth.uid())` or for `profiles` `USING (id = auth.uid())`
+- Service role bypasses RLS (for batch/cron)
+
+## Triggers
+
+- Shared trigger function `update_updated_at_column()`
+- `updated_at` maintained on: `profiles`, `decks`, `cards`, `ai_generations`, `ai_suggestions`, `study_sessions`
+
+## Notes
+
+- Uses `uuid` PKs with `gen_random_uuid()`; ensures `pgcrypto` extension
+- All timestamps are `timestamptz` (UTC)
+- Text length checks for `front`/`back` per plan (1..2000)
+- Optional FSRS fields are present on `reviews` for future algorithm migration
+- Consider retention policy for `ai_generations.source_text` (e.g., 30 days)
+- Potential future: full-text search via `tsvector` indexes on `cards(front/back)`
+
+## Apply migration locally
+
+1) Start Supabase local stack (if not running)
+   - `supabase start`
+2) Reset local DB to apply migrations cleanly
+   - `supabase db reset`
+3) Regenerate TypeScript types against local schema
+   - `supabase gen types typescript --local > 10x-astro-starter/src/db/database.types.ts`
+
+## Follow-ups for app code
+
+- The previous draft used `flashcards`/`suggestion_sessions`/`card_suggestions` naming. After this migration, update the app to use `cards`/`ai_generations`/`ai_suggestions` and `reviews` as per this schema.
+- Regenerate `database.types.ts`, then update any references in `10x-astro-starter/src/types.ts` accordingly.
+
