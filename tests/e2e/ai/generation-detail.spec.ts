@@ -4,6 +4,7 @@
 
 import { test, expect } from '@playwright/test';
 import { PageObjectFactory } from '../../utils/page-objects';
+import { testIds } from '../../utils/test-helpers';
 
 test.describe('Generation Detail Page', () => {
   let pageFactory: PageObjectFactory;
