@@ -1,0 +1,214 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [ opened, synchronize, reopened ]
+
+env:
+  NODE_VERSION: '22.14.0'
+
+jobs:
+  # Lint job - runs first
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Prettier check
+        run: npm run format -- --check
+
+  # Unit tests job - runs in parallel with e2e after lint
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: npm run test:unit:coverage
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: coverage/
+          retention-days: 30
+
+  # E2E tests job - runs in parallel with unit tests after lint
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      NODE_ENV: integration
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      DEFAULT_OPENROUTER_MODEL: ${{ secrets.DEFAULT_OPENROUTER_MODEL }}
+      APP_REFERER: ${{ secrets.APP_REFERER }}
+      APP_TITLE: ${{ secrets.APP_TITLE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+      - name: Upload test results JSON
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results-json
+          path: test-results.json
+          retention-days: 30
+
+  # Status comment job - runs only after all previous jobs succeed
+  status-comment:
+    name: Status Comment
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, e2e-tests]
+    if: success()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: unit-test-coverage
+          path: coverage/
+
+      - name: Download E2E test results
+        uses: actions/download-artifact@v5
+        with:
+          name: e2e-test-results-json
+          path: e2e-results/
+
+      - name: Generate status comment
+        run: |
+          echo "## ✅ All Checks Passed!" >> comment.md
+          echo "" >> comment.md
+          echo "### 🧪 Test Results:" >> comment.md
+          echo "- **Linting**: ✅ Passed" >> comment.md
+          echo "- **Unit Tests**: ✅ Passed" >> comment.md
+          echo "- **E2E Tests**: ✅ Passed" >> comment.md
+          echo "" >> comment.md
+          echo "### 📊 Coverage:" >> comment.md
+          if [ -f "coverage/lcov-report/index.html" ]; then
+            echo "- Unit test coverage reports generated" >> comment.md
+          fi
+          if [ -f "e2e-results/test-results.json" ]; then
+            echo "- E2E test results available" >> comment.md
+          fi
+          echo "" >> comment.md
+          echo "### 🔍 Details:" >> comment.md
+          echo "- **Node.js**: ${{ env.NODE_VERSION }}" >> comment.md
+          echo "- **Environment**: Integration" >> comment.md
+          echo "- **Browser**: Chromium" >> comment.md
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('comment.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Failure notification job - runs only if any job fails
+  failure-notification:
+    name: Failure Notification
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, e2e-tests]
+    if: failure()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Generate failure comment
+        run: |
+          echo "## ❌ Some Checks Failed" >> failure-comment.md
+          echo "" >> failure-comment.md
+          echo "### 🔍 Failed Jobs:" >> failure-comment.md
+          if [ "${{ needs.lint.result }}" == "failure" ]; then
+            echo "- **Linting**: ❌ Failed" >> failure-comment.md
+          fi
+          if [ "${{ needs.unit-tests.result }}" == "failure" ]; then
+            echo "- **Unit Tests**: ❌ Failed" >> failure-comment.md
+          fi
+          if [ "${{ needs.e2e-tests.result }}" == "failure" ]; then
+            echo "- **E2E Tests**: ❌ Failed" >> failure-comment.md
+          fi
+          echo "" >> failure-comment.md
+          echo "Please check the workflow logs for details and fix the issues before merging." >> failure-comment.md
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('failure-comment.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
