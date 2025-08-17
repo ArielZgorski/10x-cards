@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -16,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+
 import { QueryProvider } from "./providers/QueryProvider";
 import {
   useGenerationWithPolling,
@@ -72,19 +66,31 @@ const StatusBanner = ({
   const config = getStatusConfig(status);
 
   return (
-    <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg">
+    <div
+      className="mb-6 p-4 bg-white border border-gray-200 rounded-lg"
+      data-testid="status-banner"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h3 className={`font-medium ${config.color}`}>Status</h3>
           <p className="text-sm text-gray-600 mt-1">{config.label}</p>
           {error && (
-            <p className="text-sm text-red-600 mt-1">
-              {typeof error === "object" && error.message
-                ? error.message
+            <p
+              className="text-sm text-red-600 mt-1"
+              data-testid="error-message"
+            >
+              {typeof error === "object" && error && "message" in error
+                ? String((error as Record<string, unknown>).message)
                 : JSON.stringify(error)}
             </p>
           )}
         </div>
+        {status === "running" && (
+          <div className="flex items-center" data-testid="loading-spinner">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-sm text-blue-600">Przetwarzanie...</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -95,7 +101,10 @@ const GenerationMetaPanel = ({
 }: {
   generation: AIGenerationDTO;
 }) => (
-  <div className="mb-8 p-6 bg-white border border-gray-200 rounded-lg">
+  <div
+    className="mb-8 p-6 bg-white border border-gray-200 rounded-lg"
+    data-testid="meta-panel"
+  >
     <h2 className="text-lg font-semibold text-gray-900 mb-4">
       Metadane generacji
     </h2>
@@ -171,7 +180,10 @@ const SuggestionsToolbar = ({
   onAcceptSelected: () => void;
   onRejectSelected: () => void;
 }) => (
-  <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg">
+  <div
+    className="mb-6 p-4 bg-white border border-gray-200 rounded-lg"
+    data-testid="suggestions-toolbar"
+  >
     <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
@@ -185,6 +197,7 @@ const SuggestionsToolbar = ({
             <SelectTrigger
               className="w-48 h-9 border-gray-300"
               id="status-filter"
+              data-testid="status-filter"
             >
               <SelectValue placeholder="Wybierz status" />
             </SelectTrigger>
@@ -197,13 +210,14 @@ const SuggestionsToolbar = ({
             </SelectContent>
           </Select>
         </div>
-        {selectedCount > 0 && (
-          <div className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded border border-blue-200">
-            <span className="text-sm font-medium">
-              {selectedCount} zaznaczonych
-            </span>
-          </div>
-        )}
+        <div
+          className={`px-3 py-1.5 rounded border ${selectedCount > 0 ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}
+          data-testid="selected-count"
+        >
+          <span className="text-sm font-medium">
+            {selectedCount} zaznaczonych
+          </span>
+        </div>
       </div>
       <div className="flex gap-3">
         <Button
@@ -212,6 +226,7 @@ const SuggestionsToolbar = ({
           variant="default"
           size="sm"
           className="h-9 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300"
+          data-testid="accept-selected"
         >
           Akceptuj zaznaczone
           {selectedCount > 0 && ` (${selectedCount})`}
@@ -222,6 +237,7 @@ const SuggestionsToolbar = ({
           variant="outline"
           size="sm"
           className="h-9 border-gray-300 text-gray-700 hover:bg-gray-50 disabled:text-gray-400"
+          data-testid="reject-selected"
         >
           Odrzuć zaznaczone
           {selectedCount > 0 && ` (${selectedCount})`}
@@ -289,11 +305,12 @@ const SuggestionsList = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="suggestions-list">
       {suggestions.map((suggestion, index) => (
         <div
           key={suggestion.id}
           className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+          data-testid="suggestion-item"
         >
           <div className="p-6">
             {/* Header with checkbox, title and actions */}
@@ -304,6 +321,7 @@ const SuggestionsList = ({
                   onCheckedChange={() => onToggleSelect(suggestion.id)}
                   className="border-gray-300"
                   aria-label={`Zaznacz sugestię ${suggestion.id}`}
+                  data-testid="suggestion-checkbox"
                 />
                 <div>
                   <h3 className="font-medium text-gray-900">
@@ -319,6 +337,7 @@ const SuggestionsList = ({
                             ? "bg-yellow-100 text-yellow-700"
                             : "bg-blue-100 text-blue-700"
                     }`}
+                    data-testid="status-badge"
                   >
                     {suggestion.status === "proposed"
                       ? "Zaproponowane"
@@ -336,6 +355,7 @@ const SuggestionsList = ({
                   variant="ghost"
                   disabled={suggestion.status === "accepted"}
                   className="h-8 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  data-testid="edit-button"
                 >
                   Edytuj
                 </Button>
@@ -347,6 +367,7 @@ const SuggestionsList = ({
                     suggestion.status === "rejected"
                   }
                   className="h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300"
+                  data-testid="accept-button"
                 >
                   Akceptuj
                 </Button>
@@ -355,6 +376,7 @@ const SuggestionsList = ({
                   variant="outline"
                   disabled={suggestion.status === "accepted"}
                   className="h-8 border-red-300 text-red-600 hover:bg-red-50 disabled:text-gray-400"
+                  data-testid="reject-button"
                 >
                   Odrzuć
                 </Button>
@@ -364,9 +386,9 @@ const SuggestionsList = ({
             {/* Form-like content grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="block text-sm font-medium text-gray-700 mb-2">
                   Przód fiszki <span className="text-red-500">*</span>
-                </label>
+                </div>
                 <div className="w-full p-3 border border-gray-300 rounded-lg bg-white min-h-[80px] text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   {suggestion.front}
                 </div>
@@ -375,9 +397,9 @@ const SuggestionsList = ({
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="block text-sm font-medium text-gray-700 mb-2">
                   Tył fiszki <span className="text-red-500">*</span>
-                </label>
+                </div>
                 <div className="w-full p-3 border border-gray-300 rounded-lg bg-white min-h-[80px] text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   {suggestion.back}
                 </div>
@@ -441,18 +463,11 @@ function GenerationDetailContent({ generationId }: GenerationDetailPageProps) {
 
   // Event handlers - to be implemented in later steps
   const handleAcceptSelected = () => {
-    console.log("Accept selected:", selection.getSelectedArray());
     // TODO: Open DeckSelectModal and then call accept-batch API
   };
 
   const handleRejectSelected = () => {
-    console.log("Reject selected:", selection.getSelectedArray());
     // TODO: Call reject-batch API (PUT status=rejected for each)
-  };
-
-  const handleDeleteGeneration = () => {
-    console.log("Delete generation:", generationId);
-    // TODO: Open ConfirmModal and then call DELETE API
   };
 
   if (loading) {
@@ -596,6 +611,23 @@ function GenerationDetailContent({ generationId }: GenerationDetailPageProps) {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Breadcrumbs */}
+        <nav className="mb-6" data-testid="breadcrumbs">
+          <ol className="flex items-center space-x-2 text-sm text-gray-500">
+            <li>
+              <a href="/ai/generations" className="hover:text-gray-700">
+                Generowanie AI
+              </a>
+            </li>
+            <li className="flex items-center">
+              <span className="mx-2">/</span>
+              <span className="text-gray-900">
+                Generacja #{generationId.slice(0, 8)}
+              </span>
+            </li>
+          </ol>
+        </nav>
+
         {/* Simple Page Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">
@@ -607,10 +639,15 @@ function GenerationDetailContent({ generationId }: GenerationDetailPageProps) {
         </div>
 
         {/* Status Banner */}
-        <StatusBanner status={generation.status} error={generation.error} />
+        <StatusBanner
+          status={(generation as unknown as AIGenerationDTO).status}
+          error={(generation as unknown as AIGenerationDTO).error}
+        />
 
         {/* Generation Metadata */}
-        <GenerationMetaPanel generation={generation} />
+        <GenerationMetaPanel
+          generation={generation as unknown as AIGenerationDTO}
+        />
 
         {/* Suggestions Section */}
         <div>

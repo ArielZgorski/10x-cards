@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useId, useEffect } from "react";
+import React, { useState, useCallback, useId } from "react";
 import { useAuth } from "../auth/AuthProvider";
 
 interface LoginFormProps {
@@ -62,22 +62,57 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   );
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
 
-      console.log("Form submitted!");
+      // Clear previous errors
+      setErrors({});
+      setSubmitError("");
 
-      // IMMEDIATE redirect - no checks, no async
-      window.location.href = redirectTo;
+      // Validate form
+      const emailError = validateEmail(formData.email);
+      const passwordError = validatePassword(formData.password);
+
+      if (emailError || passwordError) {
+        setErrors({
+          email: emailError,
+          password: passwordError,
+        });
+        return;
+      }
+
+      if (!signIn) {
+        setSubmitError("AuthProvider nie jest gotowy");
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+
+        const result = await signIn(formData.email, formData.password);
+
+        if (result.success) {
+          // Success - redirect will happen via AuthProvider state change or onSuccess callback
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            // Fallback redirect
+            window.location.href = redirectTo;
+          }
+        } else {
+          setSubmitError(result.error || "Błąd logowania");
+        }
+      } catch {
+        setSubmitError("Wystąpił nieoczekiwany błąd");
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [redirectTo],
+    [formData, validateEmail, validatePassword, signIn, onSuccess, redirectTo],
   );
 
-  // Never disable form in mock mode
-  const isFormDisabled = false;
-
-  // Always show the form - it's better UX
-  // We'll handle auth once it's available
+  // Form is disabled during submission or while loading
+  const isFormDisabled = isSubmitting || loading;
 
   const formStyle: React.CSSProperties = {
     display: "flex",
@@ -163,7 +198,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   return (
     <div>
-      <form onSubmit={handleSubmit} style={formStyle} noValidate>
+      <form
+        onSubmit={handleSubmit}
+        style={formStyle}
+        noValidate
+        data-testid="login-form"
+      >
         <div style={formGroupStyle}>
           <label htmlFor={emailId} style={labelStyle}>
             Email
@@ -179,6 +219,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             autoComplete="email"
             disabled={isFormDisabled}
             aria-describedby={errors.email ? `${emailId}-error` : undefined}
+            data-testid="email"
           />
           {errors.email && (
             <span id={`${emailId}-error`} style={errorStyle} role="alert">
@@ -204,6 +245,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             aria-describedby={
               errors.password ? `${passwordId}-error` : undefined
             }
+            data-testid="password"
           />
           {errors.password && (
             <span id={`${passwordId}-error`} style={errorStyle} role="alert">
@@ -212,7 +254,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           )}
         </div>
 
-        <button type="submit" disabled={isFormDisabled} style={buttonStyle}>
+        <button
+          type="submit"
+          disabled={isFormDisabled}
+          style={buttonStyle}
+          data-testid="login-button"
+        >
           {isSubmitting ? (
             <>
               <div
@@ -233,7 +280,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </button>
 
         {submitError && (
-          <div style={submitErrorStyle} role="alert">
+          <div
+            style={submitErrorStyle}
+            role="alert"
+            data-testid="error-message"
+          >
             {submitError}
           </div>
         )}

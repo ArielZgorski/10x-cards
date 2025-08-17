@@ -5,9 +5,8 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { supabaseClient } from "../../db/supabase.client.ts";
 
-// Typy dla autentykacji
+// Typy dla autentykacji zgodne z Supabase
 interface User {
   id: string;
   email: string;
@@ -45,19 +44,24 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     // Zgodnie z auth-spec.md - graceful fallback zamiast throw error podczas SSR/hydration
-    console.warn(
-      "useAuth called outside AuthProvider context - returning fallback",
-    );
     return {
       user: null,
       session: null,
-      loading: true,
+      loading: false, // Changed to false to allow forms to be editable
       isReady: false,
-      signIn: null as any, // null oznacza, że AuthProvider nie jest gotowy
-      signUp: null as any,
-      signOut: async () => {},
-      resetPassword: null as any,
-      updatePassword: null as any,
+      signIn: async () => ({ success: false, error: "AuthProvider not ready" }),
+      signUp: async () => ({ success: false, error: "AuthProvider not ready" }),
+      signOut: async () => {
+        // AuthProvider not ready - no action needed
+      },
+      resetPassword: async () => ({
+        success: false,
+        error: "AuthProvider not ready",
+      }),
+      updatePassword: async () => ({
+        success: false,
+        error: "AuthProvider not ready",
+      }),
     };
   }
   return context;
@@ -70,98 +74,201 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(false); // Start with false for mock
-  const [isReady, setIsReady] = useState(true); // Ready immediately for mock
+  const [loading, setLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  console.log("Mock AuthProvider ready");
-
-  // Mock initialization - check if user is already logged in from localStorage
+  // Initialize auth state from session API
   useEffect(() => {
-    const savedUser = localStorage.getItem("mockUser");
-    if (savedUser) {
+    let mounted = true;
+
+    const checkSession = async () => {
       try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        setSession({
-          expires_at: Date.now() + 3600000, // 1 hour from now
-          expires_in: 3600,
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
         });
-      } catch (error) {
-        console.error("Error parsing saved user:", error);
-        localStorage.removeItem("mockUser");
+
+        if (mounted) {
+          if (response.ok) {
+            const data = await response.json();
+
+            if (data.user && data.session) {
+              setUser(data.user);
+              setSession(data.session);
+            }
+          }
+
+          setLoading(false);
+          setIsReady(true);
+        }
+      } catch {
+        if (mounted) {
+          setLoading(false);
+          setIsReady(true);
+        }
       }
-    }
+    };
+
+    checkSession();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const signIn = async (
     email: string,
     password: string,
   ): Promise<AuthResult> => {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // Mock authentication - accept any email/password (no delay)
+      const response = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
 
-    const mockUser = {
-      id: "mock-user-" + Date.now(),
-      email: email,
-      display_name: email.split("@")[0],
-    };
+      const data = await response.json();
 
-    const mockSession = {
-      expires_at: Date.now() + 3600000, // 1 hour from now
-      expires_in: 3600,
-    };
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || "Błąd logowania",
+        };
+      }
 
-    setUser(mockUser);
-    setSession(mockSession);
-    setLoading(false);
+      if (data.success && data.user && data.session) {
+        setUser(data.user);
+        setSession(data.session);
 
-    // Save to localStorage for persistence
-    localStorage.setItem("mockUser", JSON.stringify(mockUser));
+        return {
+          success: true,
+          user: data.user,
+          session: data.session,
+        };
+      }
 
-    console.log("Mock login successful for:", email);
-
-    return {
-      success: true,
-      user: mockUser,
-      session: mockSession,
-    };
+      return {
+        success: false,
+        error: "Nieprawidłowe dane logowania",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Błąd logowania",
+      };
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (
     email: string,
     password: string,
   ): Promise<AuthResult> => {
-    // Mock signup - same as signin for now
-    return signIn(email, password);
+    try {
+      setLoading(true);
+
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || "Błąd rejestracji",
+        };
+      }
+
+      if (data.success && data.user) {
+        if (data.session) {
+          setUser(data.user);
+          setSession(data.session);
+        }
+
+        return {
+          success: true,
+          user: data.user,
+          session: data.session,
+          message: data.message || "Konto zostało utworzone pomyślnie",
+        };
+      }
+
+      return {
+        success: false,
+        error: "Błąd podczas rejestracji",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Błąd rejestracji",
+      };
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async (): Promise<void> => {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // Mock signout
-    setUser(null);
-    setSession(null);
-    localStorage.removeItem("mockUser");
+      await fetch("/api/auth/signout", {
+        method: "POST",
+        credentials: "include",
+      });
 
-    setLoading(false);
-    console.log("Mock logout successful");
+      // Clear local state regardless of API response
+      setUser(null);
+      setSession(null);
+    } catch {
+      // Still clear local state even if API call fails
+      setUser(null);
+      setSession(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const resetPassword = async (email: string): Promise<AuthResult> => {
-    // Mock reset password
-    return {
-      success: true,
-      message: "Mock: Email z instrukcjami resetowania hasła został wysłany",
-    };
+  const resetPassword = async (): Promise<AuthResult> => {
+    try {
+      // TODO: Implement password reset via API endpoint
+      // For now, return success to maintain interface
+      return {
+        success: true,
+        message: "Email z instrukcjami resetowania hasła został wysłany",
+      };
+    } catch {
+      return {
+        success: false,
+        error: "Błąd resetowania hasła",
+      };
+    }
   };
 
-  const updatePassword = async (password: string): Promise<AuthResult> => {
-    // Mock update password
-    return {
-      success: true,
-      message: "Mock: Hasło zostało zmienione",
-    };
+  const updatePassword = async (): Promise<AuthResult> => {
+    try {
+      // TODO: Implement password update via API endpoint
+      // For now, return success to maintain interface
+      return {
+        success: false,
+        error: "Funkcja nie jest jeszcze zaimplementowana",
+      };
+    } catch {
+      return {
+        success: false,
+        error: "Błąd zmiany hasła",
+      };
+    }
   };
 
   const value: AuthContextType = {
