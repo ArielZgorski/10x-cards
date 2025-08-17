@@ -250,36 +250,124 @@ Komponenty zostały zaprojektowane z myślą o łatwej migracji:
 
 ### Testowanie
 
+#### Tech Stack Testów
+
+**Testy Jednostkowe:**
+- **Vitest** - Framework testowy (kompatybilny z Vite)
+- **Vi mocking** - System mocków i spies
+- **TypeScript** - Pełne wsparcie typów w testach
+- **Timer mocking** - Testowanie funkcji asynchronicznych i opóźnień
+
+**Testy E2E (End-to-End):**
+- **Manual UI Testing** - Strukturalne testowanie interfejsu z przygotowanymi scenariuszami
+- **Test UI Framework** - Dedykowane narzędzie testowe z checklist'ami
+- **Browser DevTools** - Wykorzystanie console.log i network monitoring
+- **Responsive Testing** - Testowanie na różnych rozmiarach ekranów
+
 #### Unit Tests
 
-Komponenty są przygotowane do testowania:
+Projekty używa **Vitest** jako głównego frameworka do testów jednostkowych:
+
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run"
+  }
+}
+```
+
+**Przykład testu z mockowaniem:**
 
 ```typescript
-// Przykład testu LoginForm
-import { render, screen, fireEvent } from '@testing-library/react';
-import { AuthProvider } from '../auth/AuthProvider';
-import { LoginForm } from '../forms/LoginForm';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ensureRateLimit } from '../rate-limit';
 
-test('validates email format', async () => {
-  render(
-    <AuthProvider>
-      <LoginForm />
-    </AuthProvider>
-  );
-  
-  const emailInput = screen.getByLabelText(/email/i);
-  fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
-  
-  expect(screen.getByText(/nieprawidłowy format email/i)).toBeInTheDocument();
+describe('Rate Limiting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it('should allow first request', async () => {
+    const result = await ensureRateLimit('user1', 'ai_generation');
+    
+    expect(result.ok).toBe(true);
+    expect(result.limit).toBe(5);
+    expect(result.remaining).toBe(4);
+  });
 });
+```
+
+**Kluczowe biblioteki testowe:**
+- `vi.mock()` - Mockowanie modułów i zależności
+- `vi.useFakeTimers()` - Kontrola czasu w testach
+- `vi.spyOn()` - Monitorowanie wywołań funkcji
+- `expect()` - Asercje kompatybilne z Jest
+
+#### E2E Testing
+
+Projekt wykorzystuje **strukturalne testowanie manualne** z dedykowanymi narzędziami:
+
+**Test UI Framework** (`test-ui.html`):
+- Przygotowane scenariusze testowe
+- Automatyczne sprawdzanie statusu serwera
+- Linki do różnych stanów aplikacji
+- Checklist kontrolny dla testerów
+
+**Główne scenariusze E2E:**
+1. **Podstawowe scenariusze**:
+   - Generacja zakończona sukcesem
+   - Generacja w toku (polling demo)
+   - Generacja z błędem
+
+2. **Testowanie interakcji**:
+   - Filtrowanie statusów
+   - Selekcja wielu elementów
+   - Test responsywności
+
+3. **Komponenty UI**:
+   - Shadcn/ui Select dropdown
+   - Checkbox i selekcja
+   - Status badges w różnych kolorach
+   - Loading states ze Skeleton
+
+**Przykład checklist E2E:**
+```html
+<!-- test-ui.html zapewnia strukturalne testowanie -->
+<div class="test-category">
+  <h3>📝 Podstawowe scenariusze</h3>
+  <div class="test-links">
+    <a href="/ai/generations/test-generation-1" class="test-link success">
+      ✅ Generacja zakończona sukcesem
+    </a>
+  </div>
+</div>
 ```
 
 #### Integration Tests
 
-- **Form submission flows**
-- **Auth state changes**
-- **Error scenarios**
-- **Redirect behaviors**
+**Obszary testowania integracyjnego:**
+- **Form submission flows** - Przepływ formularzy autentykacji
+- **Auth state changes** - Zmiany stanu uwierzytelnienia
+- **Error scenarios** - Scenariusze błędów i fallback
+- **Redirect behaviors** - Zachowania przekierowań
+- **API endpoint testing** - Testowanie endpointów API
+- **Database integration** - Integracja z Supabase
+
+**Mock setup dla testów:**
+```typescript
+// Mock Supabase w testach
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(),
+}));
+
+// Mock OpenRouter service
+vi.mock('../openrouter.service', () => ({
+  createOpenRouterService: vi.fn(),
+  OpenRouterService: vi.fn(),
+}));
+```
 
 ### Konserwacja i Rozwój
 
