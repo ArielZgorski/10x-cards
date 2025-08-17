@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { Button } from "@/components/ui/button";
 
 interface PaginationBarProps {
   page: number;
@@ -8,9 +8,14 @@ interface PaginationBarProps {
   onPageChange: (page: number) => void;
 }
 
-export function PaginationBar({ page, perPage, total, onPageChange }: PaginationBarProps) {
+export function PaginationBar({
+  page,
+  perPage,
+  total,
+  onPageChange,
+}: PaginationBarProps) {
   const totalPages = Math.ceil(total / perPage);
-  
+
   if (totalPages <= 1) {
     return null;
   }
@@ -23,12 +28,16 @@ export function PaginationBar({ page, perPage, total, onPageChange }: Pagination
     const range = [];
     const rangeWithDots = [];
 
-    for (let i = Math.max(2, page - delta); i <= Math.min(totalPages - 1, page + delta); i++) {
+    for (
+      let i = Math.max(2, page - delta);
+      i <= Math.min(totalPages - 1, page + delta);
+      i++
+    ) {
       range.push(i);
     }
 
     if (page - delta > 2) {
-      rangeWithDots.push(1, '...');
+      rangeWithDots.push(1, "...");
     } else {
       rangeWithDots.push(1);
     }
@@ -36,7 +45,7 @@ export function PaginationBar({ page, perPage, total, onPageChange }: Pagination
     rangeWithDots.push(...range);
 
     if (page + delta < totalPages - 1) {
-      rangeWithDots.push('...', totalPages);
+      rangeWithDots.push("...", totalPages);
     } else if (totalPages > 1) {
       rangeWithDots.push(totalPages);
     }
@@ -51,7 +60,7 @@ export function PaginationBar({ page, perPage, total, onPageChange }: Pagination
       <div className="flex items-center text-sm text-muted-foreground">
         Pokazano {startItem}-{endItem} z {total} elementów
       </div>
-      
+
       <div className="flex items-center space-x-2">
         {/* Previous button */}
         <Button
@@ -66,9 +75,12 @@ export function PaginationBar({ page, perPage, total, onPageChange }: Pagination
         {/* Page numbers */}
         <div className="flex items-center space-x-1">
           {visiblePages.map((pageNum, index) => {
-            if (pageNum === '...') {
+            if (pageNum === "...") {
               return (
-                <span key={`dots-${index}`} className="px-2 py-1 text-muted-foreground">
+                <span
+                  key={`dots-${index}`}
+                  className="px-2 py-1 text-muted-foreground"
+                >
                   ...
                 </span>
               );

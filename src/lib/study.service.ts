@@ -1,13 +1,19 @@
 /**
  * Study Service
- * 
+ *
  * Handles business logic for study sessions, reviews, and statistics.
  */
 
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../db/database.types';
-import type { ReviewDTO, CreateReviewCommand, StudyStatisticsDTO, UUID, CardDTO } from '../types';
-import { calculateSM2, type SM2Card } from './sm2.service';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../../database/types/database.types";
+import type {
+  ReviewDTO,
+  CreateReviewCommand,
+  StudyStatisticsDTO,
+  UUID,
+  CardDTO,
+} from "../types";
+import { calculateSM2, type SM2Card } from "./sm2.service";
 
 type SupabaseClient = ReturnType<typeof createClient<Database>>;
 
@@ -18,14 +24,14 @@ export async function createReview(
   supabase: SupabaseClient,
   cardId: UUID,
   userId: UUID,
-  command: CreateReviewCommand
+  command: CreateReviewCommand,
 ): Promise<{ review: ReviewDTO; card: CardDTO }> {
   // Get current card state
   const { data: cardData, error: cardError } = await supabase
-    .from('cards')
+    .from("cards")
     .select()
-    .eq('id', cardId)
-    .eq('user_id', userId)
+    .eq("id", cardId)
+    .eq("user_id", userId)
     .single();
 
   if (cardError) {
@@ -37,7 +43,9 @@ export async function createReview(
     repetitions_count: cardData.repetitions_count,
     ease_factor: parseFloat(cardData.ease_factor.toString()),
     interval_days: cardData.interval_days,
-    last_reviewed_at: cardData.last_reviewed_at ? new Date(cardData.last_reviewed_at) : null,
+    last_reviewed_at: cardData.last_reviewed_at
+      ? new Date(cardData.last_reviewed_at)
+      : null,
     lapses_count: cardData.lapses_count,
   };
 
@@ -47,7 +55,7 @@ export async function createReview(
 
   // Start transaction to create review and update card
   const { data: reviewData, error: reviewError } = await supabase
-    .from('reviews')
+    .from("reviews")
     .insert({
       card_id: cardId,
       user_id: userId,
@@ -73,7 +81,7 @@ export async function createReview(
 
   // Update card with new SM-2 values
   const { data: updatedCardData, error: updateError } = await supabase
-    .from('cards')
+    .from("cards")
     .update({
       repetitions_count: sm2Result.repetitions_count,
       ease_factor: sm2Result.ease_factor,
@@ -83,8 +91,8 @@ export async function createReview(
       last_reviewed_at: reviewDate.toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', cardId)
-    .eq('user_id', userId)
+    .eq("id", cardId)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -103,64 +111,81 @@ export async function createReview(
  */
 export async function getStudyStatistics(
   supabase: SupabaseClient,
-  userId: UUID
+  userId: UUID,
 ): Promise<StudyStatisticsDTO> {
   // Get cards statistics
   const { data: cardsData, error: cardsError } = await supabase
-    .from('cards')
-    .select('id, is_archived, due_at')
-    .eq('user_id', userId);
+    .from("cards")
+    .select("id, is_archived, due_at")
+    .eq("user_id", userId);
 
   if (cardsError) {
     throw new Error(`Failed to get cards statistics: ${cardsError.message}`);
   }
 
   const cardsTotal = cardsData?.length || 0;
-  const cardsArchived = cardsData?.filter(card => card.is_archived).length || 0;
-  const cardsDue = cardsData?.filter(card => 
-    !card.is_archived && (card.due_at === null || new Date(card.due_at) <= new Date())
-  ).length || 0;
+  const cardsArchived =
+    cardsData?.filter((card) => card.is_archived).length || 0;
+  const cardsDue =
+    cardsData?.filter(
+      (card) =>
+        !card.is_archived &&
+        (card.due_at === null || new Date(card.due_at) <= new Date()),
+    ).length || 0;
 
   // Get AI statistics
   const { data: aiGenerationsData, error: aiGenError } = await supabase
-    .from('ai_generations')
-    .select('id')
-    .eq('user_id', userId);
+    .from("ai_generations")
+    .select("id")
+    .eq("user_id", userId);
 
   if (aiGenError) {
-    throw new Error(`Failed to get AI generations statistics: ${aiGenError.message}`);
+    throw new Error(
+      `Failed to get AI generations statistics: ${aiGenError.message}`,
+    );
   }
 
   const { data: aiSuggestionsData, error: aiSugError } = await supabase
-    .from('ai_suggestions')
-    .select('id, status')
-    .eq('user_id', userId);
+    .from("ai_suggestions")
+    .select("id, status")
+    .eq("user_id", userId);
 
   if (aiSugError) {
-    throw new Error(`Failed to get AI suggestions statistics: ${aiSugError.message}`);
+    throw new Error(
+      `Failed to get AI suggestions statistics: ${aiSugError.message}`,
+    );
   }
 
   const aiGenerationsTotal = aiGenerationsData?.length || 0;
   const aiSuggestionsTotal = aiSuggestionsData?.length || 0;
-  const aiSuggestionsAccepted = aiSuggestionsData?.filter(s => s.status === 'accepted').length || 0;
-  const aiAcceptanceRate = aiSuggestionsTotal > 0 ? aiSuggestionsAccepted / aiSuggestionsTotal : 0;
+  const aiSuggestionsAccepted =
+    aiSuggestionsData?.filter((s) => s.status === "accepted").length || 0;
+  const aiAcceptanceRate =
+    aiSuggestionsTotal > 0 ? aiSuggestionsAccepted / aiSuggestionsTotal : 0;
 
   // Get reviews statistics
   const { data: reviewsData, error: reviewsError } = await supabase
-    .from('reviews')
-    .select('id, reviewed_at')
-    .eq('user_id', userId);
+    .from("reviews")
+    .select("id, reviewed_at")
+    .eq("user_id", userId);
 
   if (reviewsError) {
-    throw new Error(`Failed to get reviews statistics: ${reviewsError.message}`);
+    throw new Error(
+      `Failed to get reviews statistics: ${reviewsError.message}`,
+    );
   }
 
   const reviewsTotal = reviewsData?.length || 0;
-  
+
   // Get last reviewed date
-  const lastReviewedAt = reviewsData && reviewsData.length > 0 
-    ? reviewsData.sort((a, b) => new Date(b.reviewed_at).getTime() - new Date(a.reviewed_at).getTime())[0].reviewed_at
-    : null;
+  const lastReviewedAt =
+    reviewsData && reviewsData.length > 0
+      ? reviewsData.sort(
+          (a, b) =>
+            new Date(b.reviewed_at).getTime() -
+            new Date(a.reviewed_at).getTime(),
+        )[0].reviewed_at
+      : null;
 
   return {
     cards_total: cardsTotal,
@@ -184,21 +209,21 @@ export async function getStudyQueue(
   options: {
     deck_id?: UUID;
     limit?: number;
-  } = {}
+  } = {},
 ): Promise<CardDTO[]> {
   const { deck_id, limit = 20 } = options;
 
   let query = supabase
-    .from('cards')
+    .from("cards")
     .select()
-    .eq('user_id', userId)
-    .eq('is_archived', false)
-    .or('due_at.is.null,due_at.lte.' + new Date().toISOString())
-    .order('due_at', { ascending: true, nullsFirst: true })
+    .eq("user_id", userId)
+    .eq("is_archived", false)
+    .or("due_at.is.null,due_at.lte." + new Date().toISOString())
+    .order("due_at", { ascending: true, nullsFirst: true })
     .limit(limit);
 
   if (deck_id) {
-    query = query.eq('deck_id', deck_id);
+    query = query.eq("deck_id", deck_id);
   }
 
   const { data, error } = await query;
@@ -213,7 +238,9 @@ export async function getStudyQueue(
 /**
  * Map database entity to DTO
  */
-function mapReviewEntityToDTO(entity: Database['public']['Tables']['reviews']['Row']): ReviewDTO {
+function mapReviewEntityToDTO(
+  entity: Database["public"]["Tables"]["reviews"]["Row"],
+): ReviewDTO {
   return {
     id: entity.id,
     card_id: entity.card_id,
@@ -226,13 +253,15 @@ function mapReviewEntityToDTO(entity: Database['public']['Tables']['reviews']['R
 /**
  * Map card database entity to DTO
  */
-function mapCardEntityToDTO(entity: Database['public']['Tables']['cards']['Row']): CardDTO {
+function mapCardEntityToDTO(
+  entity: Database["public"]["Tables"]["cards"]["Row"],
+): CardDTO {
   return {
     id: entity.id,
     deck_id: entity.deck_id,
     front: entity.front,
     back: entity.back,
-    source: entity.source as 'manual' | 'ai',
+    source: entity.source as "manual" | "ai",
     is_archived: entity.is_archived,
     language_code: entity.language_code,
     due_at: entity.due_at,

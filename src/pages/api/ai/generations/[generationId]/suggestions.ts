@@ -2,14 +2,14 @@
  * GET /api/ai/generations/[generationId]/suggestions - List suggestions for a generation
  */
 
-import { z } from 'zod';
-import type { APIRoute } from 'astro';
+import { z } from "zod";
+import type { APIRoute } from "astro";
 
 // Zod schema for query parameters
 const GetSuggestionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   per_page: z.coerce.number().int().min(1).max(100).optional().default(20),
-  status: z.enum(['proposed', 'edited', 'accepted', 'rejected']).optional(),
+  status: z.enum(["proposed", "edited", "accepted", "rejected"]).optional(),
 });
 
 export const GET: APIRoute = async ({ request, locals, params, url }) => {
@@ -19,37 +19,40 @@ export const GET: APIRoute = async ({ request, locals, params, url }) => {
   try {
     const generationId = params.generationId;
     if (!generationId) {
-      return createErrorResponse(400, 'Generation ID is required');
+      return createErrorResponse(400, "Generation ID is required");
     }
 
     // Authentication
     const supabase = locals.supabase;
     if (!supabase) {
-      console.error('Supabase client not available', { requestId });
-      return createErrorResponse(500, 'Internal server error');
+      console.error("Supabase client not available", { requestId });
+      return createErrorResponse(500, "Internal server error");
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return createErrorResponse(401, 'Authorization header required');
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return createErrorResponse(401, "Authorization header required");
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
-      return createErrorResponse(401, 'Invalid or expired token');
+      return createErrorResponse(401, "Invalid or expired token");
     }
 
     // Verify generation exists and belongs to user
     const { data: generation, error: genError } = await supabase
-      .from('ai_generations')
-      .select('id')
-      .eq('id', generationId)
-      .eq('user_id', user.id)
+      .from("ai_generations")
+      .select("id")
+      .eq("id", generationId)
+      .eq("user_id", user.id)
       .single();
 
     if (genError) {
-      if (genError.code === 'PGRST116') {
-        return createErrorResponse(404, 'Generation not found');
+      if (genError.code === "PGRST116") {
+        return createErrorResponse(404, "Generation not found");
       }
       throw new Error(`Failed to verify generation: ${genError.message}`);
     }
@@ -57,11 +60,11 @@ export const GET: APIRoute = async ({ request, locals, params, url }) => {
     // Parse query parameters
     const queryParams = Object.fromEntries(url.searchParams.entries());
     const validationResult = GetSuggestionsQuerySchema.safeParse(queryParams);
-    
+
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(err => 
-        `${err.path.join('.')}: ${err.message}`
-      ).join(', ');
+      const errors = validationResult.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
       return createErrorResponse(400, `Query validation error: ${errors}`);
     }
 
@@ -70,17 +73,17 @@ export const GET: APIRoute = async ({ request, locals, params, url }) => {
 
     // Get suggestions
     let query = supabase
-      .from('ai_suggestions')
-      .select('*', { count: 'exact' })
-      .eq('generation_id', generationId)
-      .eq('user_id', user.id);
+      .from("ai_suggestions")
+      .select("*", { count: "exact" })
+      .eq("generation_id", generationId)
+      .eq("user_id", user.id);
 
     if (status) {
-      query = query.eq('status', status);
+      query = query.eq("status", status);
     }
 
     query = query
-      .order('created_at', { ascending: false })
+      .order("created_at", { ascending: false })
       .range(offset, offset + per_page - 1);
 
     const { data, error, count } = await query;
@@ -93,35 +96,34 @@ export const GET: APIRoute = async ({ request, locals, params, url }) => {
       items: data || [],
       total: count || 0,
       page,
-      per_page
+      per_page,
     };
 
     const duration = Date.now() - startTime;
-    console.log('Suggestions retrieved successfully', { 
-      requestId, 
-      userId: user.id, 
+    console.log("Suggestions retrieved successfully", {
+      requestId,
+      userId: user.id,
       generationId,
       count: result.items.length,
-      duration 
+      duration,
     });
 
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
       },
     });
-
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error('Error retrieving suggestions', { 
-      requestId, 
+    console.error("Error retrieving suggestions", {
+      requestId,
       duration,
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : "Unknown error",
     });
-    
-    return createErrorResponse(500, 'Internal server error');
+
+    return createErrorResponse(500, "Internal server error");
   }
 };
 
@@ -129,22 +131,22 @@ export const GET: APIRoute = async ({ request, locals, params, url }) => {
  * Helper function to create standardized error responses
  */
 function createErrorResponse(
-  status: number, 
-  message: string, 
-  additionalHeaders: Record<string, string> = {}
+  status: number,
+  message: string,
+  additionalHeaders: Record<string, string> = {},
 ): Response {
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       error: message,
       status,
       timestamp: new Date().toISOString(),
-    }), 
+    }),
     {
       status,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...additionalHeaders,
       },
-    }
+    },
   );
 }

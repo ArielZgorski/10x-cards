@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 export function useSelection<T extends string>() {
   const [selectedIds, setSelectedIds] = useState<Set<T>>(new Set());
 
   const toggle = useCallback((id: T) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
         newSet.delete(id);
@@ -23,9 +23,12 @@ export function useSelection<T extends string>() {
     setSelectedIds(new Set());
   }, []);
 
-  const isSelected = useCallback((id: T) => {
-    return selectedIds.has(id);
-  }, [selectedIds]);
+  const isSelected = useCallback(
+    (id: T) => {
+      return selectedIds.has(id);
+    },
+    [selectedIds],
+  );
 
   const getSelectedArray = useCallback(() => {
     return Array.from(selectedIds);

@@ -26,21 +26,21 @@ import { RegisterForm } from '../components/forms/RegisterForm';
 
 <script>
   // Check if already logged in and redirect
-  document.addEventListener('DOMContentLoaded', async () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     try {
-      const response = await fetch('/api/auth/session', {
-        credentials: 'include'
+      const response = await fetch("/api/auth/session", {
+        credentials: "include",
       });
-      
+  
       if (response.ok) {
         const data = await response.json();
         if (data.user && data.session) {
-          window.location.href = '/ai/generations';
+          window.location.href = "/ai/generations";
         }
       }
     } catch (error) {
       // Ignore errors, user is not logged in
-      console.debug('Not logged in');
+      console.debug("Not logged in");
     }
   });
 </script>

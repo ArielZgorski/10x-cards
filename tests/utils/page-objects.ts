@@ -3,8 +3,8 @@
  * Following the Page Object Model pattern for maintainable tests
  */
 
-import { Page, Locator, expect } from '@playwright/test';
-import { TestHelpers, testIds } from './test-helpers';
+import { Page, Locator, expect } from "@playwright/test";
+import { TestHelpers, testIds } from "./test-helpers";
 
 /**
  * Base Page Object
@@ -53,7 +53,7 @@ export class LoginPage extends BasePage {
 
   // Actions
   async navigate() {
-    await this.goto('/login');
+    await this.goto("/login");
   }
 
   async fillEmail(email: string) {
@@ -83,9 +83,10 @@ export class LoginPage extends BasePage {
     await expect(this.errorMessage).toContainText(message);
   }
 
-  async assertFieldError(field: 'email' | 'password', message: string) {
-    const fieldLocator = field === 'email' ? this.emailField : this.passwordField;
-    const errorLocator = fieldLocator.locator('~ .error-message');
+  async assertFieldError(field: "email" | "password", message: string) {
+    const fieldLocator =
+      field === "email" ? this.emailField : this.passwordField;
+    const errorLocator = fieldLocator.locator("~ .error-message");
     await expect(errorLocator).toContainText(message);
   }
 }
@@ -240,7 +241,7 @@ export class DashboardPage extends BasePage {
 
   // Actions
   async navigate() {
-    await this.goto('/');
+    await this.goto("/");
   }
 
   async navigateToGenerations() {

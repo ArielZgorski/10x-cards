@@ -1,5 +1,5 @@
-import type { APIContext } from 'astro';
-import { createServerSupabaseClient } from '../../db/supabase.client.ts';
+import type { APIContext } from "astro";
+import { createServerSupabaseClient } from "../../db/supabase.client.ts";
 
 export interface AuthenticatedUser {
   id: string;
@@ -23,32 +23,36 @@ export interface AuthError {
  * Checks for access token in cookies or Authorization header
  */
 export async function authenticateUser(
-  context: APIContext
+  context: APIContext,
 ): Promise<AuthResult | AuthError> {
   try {
     // Get access token from cookies or Authorization header
-    const accessToken = context.cookies.get('sb-access-token')?.value || 
-                       context.request.headers.get('authorization')?.replace('Bearer ', '');
-    
+    const accessToken =
+      context.cookies.get("sb-access-token")?.value ||
+      context.request.headers.get("authorization")?.replace("Bearer ", "");
+
     if (!accessToken) {
       return {
         success: false,
-        error: 'Authentication required',
-        status: 401
+        error: "Authentication required",
+        status: 401,
       };
     }
 
     // Create Supabase client with access token
     const supabase = createServerSupabaseClient(accessToken);
-    
+
     // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return {
         success: false,
-        error: 'Invalid or expired token',
-        status: 401
+        error: "Invalid or expired token",
+        status: 401,
       };
     }
 
@@ -57,15 +61,16 @@ export async function authenticateUser(
       user: {
         id: user.id,
         email: user.email!,
-        display_name: user.user_metadata?.display_name || user.email?.split('@')[0]
-      }
+        display_name:
+          user.user_metadata?.display_name || user.email?.split("@")[0],
+      },
     };
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error("Authentication error:", error);
     return {
       success: false,
-      error: 'Authentication failed',
-      status: 500
+      error: "Authentication failed",
+      status: 500,
     };
   }
 }
@@ -74,23 +79,26 @@ export async function authenticateUser(
  * Create authenticated Supabase client for API requests
  */
 export async function createAuthenticatedSupabaseClient(
-  context: APIContext
-): Promise<{ success: true; supabase: any; user: AuthenticatedUser } | AuthError> {
+  context: APIContext,
+): Promise<
+  { success: true; supabase: any; user: AuthenticatedUser } | AuthError
+> {
   const authResult = await authenticateUser(context);
-  
+
   if (!authResult.success) {
     return authResult;
   }
 
-  const accessToken = context.cookies.get('sb-access-token')?.value || 
-                     context.request.headers.get('authorization')?.replace('Bearer ', '');
-  
+  const accessToken =
+    context.cookies.get("sb-access-token")?.value ||
+    context.request.headers.get("authorization")?.replace("Bearer ", "");
+
   const supabase = createServerSupabaseClient(accessToken);
-  
+
   return {
     success: true,
     supabase,
-    user: authResult.user
+    user: authResult.user,
   };
 }
 
@@ -98,23 +106,23 @@ export async function createAuthenticatedSupabaseClient(
  * Create standardized error response
  */
 export function createErrorResponse(
-  status: number, 
-  message: string, 
-  additionalHeaders: Record<string, string> = {}
+  status: number,
+  message: string,
+  additionalHeaders: Record<string, string> = {},
 ): Response {
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       error: message,
       status,
       timestamp: new Date().toISOString(),
-    }), 
+    }),
     {
       status,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...additionalHeaders,
       },
-    }
+    },
   );
 }
 
@@ -123,13 +131,13 @@ export function createErrorResponse(
  */
 export async function requireAuth(
   context: APIContext,
-  handler: (user: AuthenticatedUser, context: APIContext) => Promise<Response>
+  handler: (user: AuthenticatedUser, context: APIContext) => Promise<Response>,
 ): Promise<Response> {
   const authResult = await authenticateUser(context);
-  
+
   if (!authResult.success) {
     return createErrorResponse(authResult.status, authResult.error);
   }
-  
+
   return handler(authResult.user, context);
 }

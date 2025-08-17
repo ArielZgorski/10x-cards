@@ -89,71 +89,71 @@ const { title = "10x Cards", currentPage } = Astro.props;
 </Layout>
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener("DOMContentLoaded", () => {
     // Initialize user info display
-    const userEmailElement = document.getElementById('user-email');
-    const logoutBtn = document.getElementById('logout-btn');
-    const logoutText = logoutBtn.querySelector('.logout-text');
-    const logoutSpinner = logoutBtn.querySelector('.logout-spinner');
-    
+    const userEmailElement = document.getElementById("user-email");
+    const logoutBtn = document.getElementById("logout-btn");
+    const logoutText = logoutBtn.querySelector(".logout-text");
+    const logoutSpinner = logoutBtn.querySelector(".logout-spinner");
+  
     // Display user email from global auth state
     if (window.authState?.user?.email && userEmailElement) {
       userEmailElement.textContent = window.authState.user.email;
     }
-    
+  
     // Enhanced logout function with loading state
     const logout = async () => {
       if (logoutBtn.disabled) return;
-      
+  
       // Show loading state
       logoutBtn.disabled = true;
-      logoutText.classList.add('hidden');
-      logoutSpinner.classList.remove('hidden');
-      
+      logoutText.classList.add("hidden");
+      logoutSpinner.classList.remove("hidden");
+  
       try {
         // Use global logout function from Layout.astro
         if (window.logout) {
           await window.logout();
         } else {
           // Fallback logout
-          await fetch('/api/auth/signout', {
-            method: 'POST',
-            credentials: 'include'
+          await fetch("/api/auth/signout", {
+            method: "POST",
+            credentials: "include",
           });
-          window.location.href = '/login';
+          window.location.href = "/login";
         }
       } catch (error) {
-        console.error('Logout error:', error);
-        
+        console.error("Logout error:", error);
+  
         // Reset button state
         logoutBtn.disabled = false;
-        logoutText.classList.remove('hidden');
-        logoutSpinner.classList.add('hidden');
-        
+        logoutText.classList.remove("hidden");
+        logoutSpinner.classList.add("hidden");
+  
         // Force logout even if API fails
-        window.location.href = '/login';
+        window.location.href = "/login";
       }
     };
-    
+  
     // Attach logout handler
-    logoutBtn.addEventListener('click', logout);
-    
+    logoutBtn.addEventListener("click", logout);
+  
     // Listen for auth state changes
     const handleAuthStateChange = () => {
       if (window.authState?.user?.email && userEmailElement) {
         userEmailElement.textContent = window.authState.user.email;
       } else if (!window.authState?.isAuthenticated) {
-        window.location.href = '/login';
+        window.location.href = "/login";
       }
     };
-    
+  
     // Listen for auth errors from other parts of the app
-    window.addEventListener('auth-error', () => {
-      window.location.href = '/login';
+    window.addEventListener("auth-error", () => {
+      window.location.href = "/login";
     });
-    
+  
     // Listen for global auth state changes
-    window.addEventListener('auth-state-changed', handleAuthStateChange);
+    window.addEventListener("auth-state-changed", handleAuthStateChange);
   });
 </script>
 

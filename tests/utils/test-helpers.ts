@@ -2,7 +2,7 @@
  * Test utilities and helpers for Playwright E2E tests
  */
 
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator, expect } from "@playwright/test";
 
 /**
  * Common test utilities
@@ -14,17 +14,17 @@ export class TestHelpers {
    * Wait for the page to be fully loaded
    */
   async waitForPageLoad() {
-    await this.page.waitForLoadState('networkidle');
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("domcontentloaded");
   }
 
   /**
    * Take a screenshot with a descriptive name
    */
   async screenshot(name: string) {
-    await this.page.screenshot({ 
+    await this.page.screenshot({
       path: `test-results/screenshots/${name}.png`,
-      fullPage: true 
+      fullPage: true,
     });
   }
 
@@ -33,7 +33,7 @@ export class TestHelpers {
    */
   async clickElement(selector: string) {
     const element = this.page.locator(selector);
-    await element.waitFor({ state: 'visible' });
+    await element.waitFor({ state: "visible" });
     await element.click();
   }
 
@@ -42,7 +42,7 @@ export class TestHelpers {
    */
   async fillField(selector: string, value: string) {
     const field = this.page.locator(selector);
-    await field.waitFor({ state: 'visible' });
+    await field.waitFor({ state: "visible" });
     await field.fill(value);
     await expect(field).toHaveValue(value);
   }
@@ -52,7 +52,7 @@ export class TestHelpers {
    */
   async assertElementContainsText(selector: string, text: string) {
     const element = this.page.locator(selector);
-    await element.waitFor({ state: 'visible' });
+    await element.waitFor({ state: "visible" });
     await expect(element).toContainText(text);
   }
 
@@ -67,10 +67,10 @@ export class TestHelpers {
    * Mock API response
    */
   async mockAPIResponse(urlPattern: string | RegExp, response: any) {
-    await this.page.route(urlPattern, route => {
+    await this.page.route(urlPattern, (route) => {
       route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(response),
       });
     });
@@ -87,9 +87,9 @@ export class TestHelpers {
    * Wait for element to be visible
    */
   async waitForElement(selector: string, timeout = 5000) {
-    await this.page.locator(selector).waitFor({ 
-      state: 'visible', 
-      timeout 
+    await this.page.locator(selector).waitFor({
+      state: "visible",
+      timeout,
     });
   }
 
@@ -105,9 +105,9 @@ export class TestHelpers {
    */
   async isElementVisible(selector: string): Promise<boolean> {
     try {
-      await this.page.locator(selector).waitFor({ 
-        state: 'visible', 
-        timeout: 1000 
+      await this.page.locator(selector).waitFor({
+        state: "visible",
+        timeout: 1000,
       });
       return true;
     } catch {
@@ -126,11 +126,11 @@ export class AuthHelpers {
    * Login with credentials
    */
   async login(email: string, password: string) {
-    await this.page.goto('/login');
+    await this.page.goto("/login");
     await this.page.fill('[data-testid="email"]', email);
     await this.page.fill('[data-testid="password"]', password);
     await this.page.click('[data-testid="login-button"]');
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState("networkidle");
   }
 
   /**
@@ -138,7 +138,7 @@ export class AuthHelpers {
    */
   async logout() {
     await this.page.click('[data-testid="logout-button"]');
-    await this.page.waitForURL('/login');
+    await this.page.waitForURL("/login");
   }
 
   /**
@@ -167,18 +167,18 @@ export const testIds = {
   loginButton: '[data-testid="login-button"]',
   logoutButton: '[data-testid="logout-button"]',
   userMenu: '[data-testid="user-menu"]',
-  
+
   // AI Generation
   generationForm: '[data-testid="generation-form"]',
   sourceTextArea: '[data-testid="source-text"]',
   generateButton: '[data-testid="generate-button"]',
   statusBanner: '[data-testid="status-banner"]',
   suggestionsList: '[data-testid="suggestions-list"]',
-  
+
   // Navigation
   breadcrumbs: '[data-testid="breadcrumbs"]',
   navMenu: '[data-testid="nav-menu"]',
-  
+
   // Common
   loadingSpinner: '[data-testid="loading-spinner"]',
   errorMessage: '[data-testid="error-message"]',

@@ -2,8 +2,8 @@
  * POST /api/decks/[deckId]/restore - Restore an archived deck
  */
 
-import type { APIRoute } from 'astro';
-import { restoreDeck } from '../../../../lib/deck.service';
+import type { APIRoute } from "astro";
+import { restoreDeck } from "../../../../lib/deck.service";
 
 export const POST: APIRoute = async ({ request, locals, params }) => {
   const requestId = crypto.randomUUID();
@@ -12,58 +12,60 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
   try {
     const deckId = params.deckId;
     if (!deckId) {
-      return createErrorResponse(400, 'Deck ID is required');
+      return createErrorResponse(400, "Deck ID is required");
     }
 
     // Authentication
     const supabase = locals.supabase;
     if (!supabase) {
-      console.error('Supabase client not available', { requestId });
-      return createErrorResponse(500, 'Internal server error');
+      console.error("Supabase client not available", { requestId });
+      return createErrorResponse(500, "Internal server error");
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return createErrorResponse(401, 'Authorization header required');
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return createErrorResponse(401, "Authorization header required");
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
-      return createErrorResponse(401, 'Invalid or expired token');
+      return createErrorResponse(401, "Invalid or expired token");
     }
 
     // Restore deck
     const deck = await restoreDeck(supabase, deckId, user.id);
 
     const duration = Date.now() - startTime;
-    console.log('Deck restored successfully', { 
-      requestId, 
-      userId: user.id, 
+    console.log("Deck restored successfully", {
+      requestId,
+      userId: user.id,
       deckId,
-      duration 
+      duration,
     });
 
     return new Response(JSON.stringify(deck), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
       },
     });
-
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error('Error restoring deck', { 
-      requestId, 
+    console.error("Error restoring deck", {
+      requestId,
       duration,
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : "Unknown error",
     });
 
-    if (error instanceof Error && error.message.includes('not found')) {
-      return createErrorResponse(404, 'Deck not found');
+    if (error instanceof Error && error.message.includes("not found")) {
+      return createErrorResponse(404, "Deck not found");
     }
-    
-    return createErrorResponse(500, 'Internal server error');
+
+    return createErrorResponse(500, "Internal server error");
   }
 };
 
@@ -71,22 +73,22 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
  * Helper function to create standardized error responses
  */
 function createErrorResponse(
-  status: number, 
-  message: string, 
-  additionalHeaders: Record<string, string> = {}
+  status: number,
+  message: string,
+  additionalHeaders: Record<string, string> = {},
 ): Response {
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       error: message,
       status,
       timestamp: new Date().toISOString(),
-    }), 
+    }),
     {
       status,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...additionalHeaders,
       },
-    }
+    },
   );
 }

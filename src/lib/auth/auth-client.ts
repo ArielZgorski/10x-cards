@@ -25,22 +25,22 @@ export interface AuthState {
  */
 export async function getCurrentSession(): Promise<AuthState> {
   try {
-    const response = await fetch('/api/auth/session', {
-      credentials: 'include' // Include cookies
+    const response = await fetch("/api/auth/session", {
+      credentials: "include", // Include cookies
     });
-    
+
     if (!response.ok) {
       return { user: null, session: null, loading: false };
     }
-    
+
     const data = await response.json();
     return {
       user: data.user,
       session: data.session,
-      loading: false
+      loading: false,
     };
   } catch (error) {
-    console.error('Error getting session:', error);
+    console.error("Error getting session:", error);
     return { user: null, session: null, loading: false };
   }
 }
@@ -48,51 +48,57 @@ export async function getCurrentSession(): Promise<AuthState> {
 /**
  * Make authenticated API request
  */
-export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+export async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
   const defaultOptions: RequestInit = {
-    credentials: 'include', // Include cookies
+    credentials: "include", // Include cookies
     headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
+      "Content-Type": "application/json",
+      ...options.headers,
     },
-    ...options
+    ...options,
   };
-  
+
   const response = await fetch(url, defaultOptions);
-  
+
   // If unauthorized, redirect to login
   if (response.status === 401) {
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
   }
-  
+
   return response;
 }
 
 /**
  * Sign in user
  */
-export async function signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
-    const response = await fetch('/api/auth/signin', {
-      method: 'POST',
+    const response = await fetch("/api/auth/signin", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
     });
-    
+
     const data = await response.json();
-    
+
     if (!response.ok) {
-      return { success: false, error: data.error || 'Login failed' };
+      return { success: false, error: data.error || "Login failed" };
     }
-    
+
     return { success: true, user: data.user };
   } catch (error) {
-    console.error('Sign in error:', error);
-    return { success: false, error: 'Network error' };
+    console.error("Sign in error:", error);
+    return { success: false, error: "Network error" };
   }
 }
 
@@ -101,15 +107,15 @@ export async function signIn(email: string, password: string): Promise<{ success
  */
 export async function signOut(): Promise<void> {
   try {
-    await fetch('/api/auth/signout', {
-      method: 'POST',
-      credentials: 'include'
+    await fetch("/api/auth/signout", {
+      method: "POST",
+      credentials: "include",
     });
   } catch (error) {
-    console.error('Sign out error:', error);
+    console.error("Sign out error:", error);
   } finally {
     // Always redirect to login
-    window.location.href = '/login';
+    window.location.href = "/login";
   }
 }
 
@@ -126,11 +132,11 @@ export async function isAuthenticated(): Promise<boolean> {
  */
 export async function requireAuth(): Promise<User> {
   const session = await getCurrentSession();
-  
+
   if (!session.user || !session.session) {
-    window.location.href = '/login';
-    throw new Error('Authentication required');
+    window.location.href = "/login";
+    throw new Error("Authentication required");
   }
-  
+
   return session.user;
 }

@@ -1,6 +1,6 @@
 /**
  * Rate limiting helper for API endpoints
- * 
+ *
  * For MVP: in-memory rate limiting (per-instance, non-distributed)
  * TODO: Replace with durable solution (Redis, Upstash KV, or rate_limits table) for production
  */
@@ -36,29 +36,29 @@ export interface RateLimitResult {
 
 /**
  * Check and enforce rate limit for a user and operation type
- * 
+ *
  * @param userId - User ID from auth
  * @param type - Type of operation for rate limiting
  * @returns Rate limit status and metadata
  */
 export async function ensureRateLimit(
   userId: string,
-  type: RateLimitType = 'default'
+  type: RateLimitType = "default",
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS[type];
   const key = `${userId}:${type}`;
   const now = Date.now();
-  
+
   // Clean up expired entries periodically to prevent memory leaks
   cleanupExpiredEntries(now);
-  
+
   const existing = rateLimitStore.get(key);
-  
+
   if (!existing || now >= existing.resetTime) {
     // First request or window has reset
     const resetTime = now + config.windowMs;
     rateLimitStore.set(key, { count: 1, resetTime });
-    
+
     return {
       ok: true,
       limit: config.maxRequests,
@@ -66,7 +66,7 @@ export async function ensureRateLimit(
       resetTime,
     };
   }
-  
+
   if (existing.count >= config.maxRequests) {
     // Rate limit exceeded
     return {
@@ -76,11 +76,11 @@ export async function ensureRateLimit(
       resetTime: existing.resetTime,
     };
   }
-  
+
   // Increment counter
   existing.count++;
   rateLimitStore.set(key, existing);
-  
+
   return {
     ok: true,
     limit: config.maxRequests,
@@ -95,7 +95,7 @@ export async function ensureRateLimit(
 function cleanupExpiredEntries(now: number): void {
   // Only clean up occasionally to avoid performance impact
   if (Math.random() > 0.01) return; // 1% chance
-  
+
   for (const [key, entry] of rateLimitStore.entries()) {
     if (now >= entry.resetTime) {
       rateLimitStore.delete(key);
@@ -108,14 +108,14 @@ function cleanupExpiredEntries(now: number): void {
  */
 export async function getRateLimitStatus(
   userId: string,
-  type: RateLimitType = 'default'
+  type: RateLimitType = "default",
 ): Promise<RateLimitResult> {
   const config = RATE_LIMITS[type];
   const key = `${userId}:${type}`;
   const now = Date.now();
-  
+
   const existing = rateLimitStore.get(key);
-  
+
   if (!existing || now >= existing.resetTime) {
     return {
       ok: true,
@@ -124,7 +124,7 @@ export async function getRateLimitStatus(
       resetTime: now + config.windowMs,
     };
   }
-  
+
   return {
     ok: existing.count < config.maxRequests,
     limit: config.maxRequests,

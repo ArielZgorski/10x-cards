@@ -33,7 +33,7 @@ let user = { id: 'mock', email: 'mock@test.com', display_name: 'Mock User' };
       // Global auth state management
       window.authState = {
         user: user,
-        isAuthenticated: !!user
+        isAuthenticated: !!user,
       };
       
       // DISABLED - No auth check
@@ -42,30 +42,30 @@ let user = { id: 'mock', email: 'mock@test.com', display_name: 'Mock User' };
       };
       
       // Listen for auth state changes across tabs
-      window.addEventListener('storage', (e) => {
-        if (e.key === 'supabase.auth.token') {
+      window.addEventListener("storage", (e) => {
+        if (e.key === "supabase.auth.token") {
           checkAuthState();
         }
       });
       
       // Listen for custom auth events
-      window.addEventListener('auth-state-changed', checkAuthState);
+      window.addEventListener("auth-state-changed", checkAuthState);
       
       // Add logout functionality globally
       window.logout = async () => {
         try {
-          await fetch('/api/auth/signout', {
-            method: 'POST',
-            credentials: 'include'
+          await fetch("/api/auth/signout", {
+            method: "POST",
+            credentials: "include",
           });
-          
+      
           window.authState.user = null;
           window.authState.isAuthenticated = false;
-          window.location.href = '/login';
+          window.location.href = "/login";
         } catch (error) {
-          console.error('Logout error:', error);
+          console.error("Logout error:", error);
           // Force logout even if API fails
-          window.location.href = '/login';
+          window.location.href = "/login";
         }
       };
     </script>

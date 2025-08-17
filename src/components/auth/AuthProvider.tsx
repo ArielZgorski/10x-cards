@@ -1,5 +1,11 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { supabaseClient } from '../../db/supabase.client.ts';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { supabaseClient } from "../../db/supabase.client.ts";
 
 // Typy dla autentykacji
 interface User {
@@ -39,7 +45,9 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     // Zgodnie z auth-spec.md - graceful fallback zamiast throw error podczas SSR/hydration
-    console.warn('useAuth called outside AuthProvider context - returning fallback');
+    console.warn(
+      "useAuth called outside AuthProvider context - returning fallback",
+    );
     return {
       user: null,
       session: null,
@@ -49,7 +57,7 @@ export const useAuth = () => {
       signUp: null as any,
       signOut: async () => {},
       resetPassword: null as any,
-      updatePassword: null as any
+      updatePassword: null as any,
     };
   }
   return context;
@@ -64,89 +72,95 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false); // Start with false for mock
   const [isReady, setIsReady] = useState(true); // Ready immediately for mock
-  
-  console.log('Mock AuthProvider ready');
+
+  console.log("Mock AuthProvider ready");
 
   // Mock initialization - check if user is already logged in from localStorage
   useEffect(() => {
-    const savedUser = localStorage.getItem('mockUser');
+    const savedUser = localStorage.getItem("mockUser");
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
         setSession({
           expires_at: Date.now() + 3600000, // 1 hour from now
-          expires_in: 3600
+          expires_in: 3600,
         });
       } catch (error) {
-        console.error('Error parsing saved user:', error);
-        localStorage.removeItem('mockUser');
+        console.error("Error parsing saved user:", error);
+        localStorage.removeItem("mockUser");
       }
     }
   }, []);
 
-  const signIn = async (email: string, password: string): Promise<AuthResult> => {
+  const signIn = async (
+    email: string,
+    password: string,
+  ): Promise<AuthResult> => {
     setLoading(true);
-    
+
     // Mock authentication - accept any email/password (no delay)
-    
+
     const mockUser = {
-      id: 'mock-user-' + Date.now(),
+      id: "mock-user-" + Date.now(),
       email: email,
-      display_name: email.split('@')[0]
+      display_name: email.split("@")[0],
     };
-    
+
     const mockSession = {
       expires_at: Date.now() + 3600000, // 1 hour from now
-      expires_in: 3600
+      expires_in: 3600,
     };
-    
+
     setUser(mockUser);
     setSession(mockSession);
     setLoading(false);
-    
+
     // Save to localStorage for persistence
-    localStorage.setItem('mockUser', JSON.stringify(mockUser));
-    
-    console.log('Mock login successful for:', email);
-    
-    return { 
-      success: true, 
-      user: mockUser, 
-      session: mockSession 
+    localStorage.setItem("mockUser", JSON.stringify(mockUser));
+
+    console.log("Mock login successful for:", email);
+
+    return {
+      success: true,
+      user: mockUser,
+      session: mockSession,
     };
   };
 
-  const signUp = async (email: string, password: string): Promise<AuthResult> => {
+  const signUp = async (
+    email: string,
+    password: string,
+  ): Promise<AuthResult> => {
     // Mock signup - same as signin for now
     return signIn(email, password);
   };
 
   const signOut = async (): Promise<void> => {
     setLoading(true);
-    
+
     // Mock signout
     setUser(null);
     setSession(null);
-    localStorage.removeItem('mockUser');
-    
+    localStorage.removeItem("mockUser");
+
     setLoading(false);
-    console.log('Mock logout successful');
+    console.log("Mock logout successful");
   };
 
   const resetPassword = async (email: string): Promise<AuthResult> => {
     // Mock reset password
-    return { 
+    return {
       success: true,
-      message: 'Mock: Email z instrukcjami resetowania hasła został wysłany'
+      message: "Mock: Email z instrukcjami resetowania hasła został wysłany",
     };
   };
 
   const updatePassword = async (password: string): Promise<AuthResult> => {
     // Mock update password
-    return { 
+    return {
       success: true,
-      message: 'Mock: Hasło zostało zmienione'
+      message: "Mock: Hasło zostało zmienione",
     };
   };
 
@@ -162,9 +176,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassword,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

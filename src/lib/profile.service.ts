@@ -1,12 +1,12 @@
 /**
  * Profile Service
- * 
+ *
  * Handles business logic for user profile operations.
  */
 
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../db/database.types';
-import type { ProfileDTO, UpdateProfileCommand, UUID } from '../types';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../../database/types/database.types";
+import type { ProfileDTO, UpdateProfileCommand, UUID } from "../types";
 
 type SupabaseClient = ReturnType<typeof createClient<Database>>;
 
@@ -15,16 +15,16 @@ type SupabaseClient = ReturnType<typeof createClient<Database>>;
  */
 export async function getProfile(
   supabase: SupabaseClient,
-  userId: UUID
+  userId: UUID,
 ): Promise<ProfileDTO | null> {
   const { data, error } = await supabase
-    .from('profiles')
+    .from("profiles")
     .select()
-    .eq('id', userId)
+    .eq("id", userId)
     .single();
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null; // Profile not found
     }
     throw new Error(`Failed to get profile: ${error.message}`);
@@ -39,17 +39,18 @@ export async function getProfile(
 export async function upsertProfile(
   supabase: SupabaseClient,
   userId: UUID,
-  command: UpdateProfileCommand
+  command: UpdateProfileCommand,
 ): Promise<ProfileDTO> {
   const updates: any = { id: userId };
 
-  if (command.display_name !== undefined) updates.display_name = command.display_name;
+  if (command.display_name !== undefined)
+    updates.display_name = command.display_name;
   if (command.timezone !== undefined) updates.timezone = command.timezone;
   if (command.locale !== undefined) updates.locale = command.locale;
 
   const { data, error } = await supabase
-    .from('profiles')
-    .upsert(updates, { onConflict: 'id' })
+    .from("profiles")
+    .upsert(updates, { onConflict: "id" })
     .select()
     .single();
 
@@ -87,7 +88,9 @@ export function validateLocale(locale: string): boolean {
 /**
  * Map database entity to DTO
  */
-function mapProfileEntityToDTO(entity: Database['public']['Tables']['profiles']['Row']): ProfileDTO {
+function mapProfileEntityToDTO(
+  entity: Database["public"]["Tables"]["profiles"]["Row"],
+): ProfileDTO {
   return {
     id: entity.id,
     display_name: entity.display_name,

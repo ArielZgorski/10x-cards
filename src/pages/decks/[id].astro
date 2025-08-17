@@ -198,7 +198,7 @@ const { id } = Astro.params;
 
 <script define:vars={{ deckId: id }}>
   // Import auth helpers
-  import('/src/lib/auth/auth-client.ts').then(authModule => {
+  import("/src/lib/auth/auth-client.ts").then((authModule) => {
     window.authClient = authModule;
     new DeckDetailManager(deckId);
   });
@@ -209,124 +209,150 @@ const { id } = Astro.params;
       this.currentCards = [];
       this.init();
     }
-    
+  
     async init() {
       this.setupEventListeners();
       await this.loadDeck();
       await this.loadCards();
     }
-    
+  
     setupEventListeners() {
       // Back button
-      document.getElementById('back-btn')?.addEventListener('click', () => {
-        window.location.href = '/decks';
+      document.getElementById("back-btn")?.addEventListener("click", () => {
+        window.location.href = "/decks";
       });
-      
+  
       // New card modal
-      document.getElementById('new-card-btn')?.addEventListener('click', () => this.showNewCardModal());
-      document.getElementById('close-modal')?.addEventListener('click', () => this.hideNewCardModal());
-      document.getElementById('cancel-btn')?.addEventListener('click', () => this.hideNewCardModal());
-      
+      document
+        .getElementById("new-card-btn")
+        ?.addEventListener("click", () => this.showNewCardModal());
+      document
+        .getElementById("close-modal")
+        ?.addEventListener("click", () => this.hideNewCardModal());
+      document
+        .getElementById("cancel-btn")
+        ?.addEventListener("click", () => this.hideNewCardModal());
+  
       // Edit card modal
-      document.getElementById('close-edit-modal')?.addEventListener('click', () => this.hideEditCardModal());
-      document.getElementById('cancel-edit-btn')?.addEventListener('click', () => this.hideEditCardModal());
-      
+      document
+        .getElementById("close-edit-modal")
+        ?.addEventListener("click", () => this.hideEditCardModal());
+      document
+        .getElementById("cancel-edit-btn")
+        ?.addEventListener("click", () => this.hideEditCardModal());
+  
       // Form submissions
-      document.getElementById('new-card-form')?.addEventListener('submit', (e) => this.handleCreateCard(e));
-      document.getElementById('edit-card-form')?.addEventListener('submit', (e) => this.handleUpdateCard(e));
-      
+      document
+        .getElementById("new-card-form")
+        ?.addEventListener("submit", (e) => this.handleCreateCard(e));
+      document
+        .getElementById("edit-card-form")
+        ?.addEventListener("submit", (e) => this.handleUpdateCard(e));
+  
       // Character counters
       this.setupCharCounters();
-      
+  
       // Filters
-      document.getElementById('search-input')?.addEventListener('input', () => this.filterCards());
-      document.getElementById('source-filter')?.addEventListener('change', () => this.filterCards());
-      document.getElementById('archive-filter')?.addEventListener('change', () => this.filterCards());
-      
+      document
+        .getElementById("search-input")
+        ?.addEventListener("input", () => this.filterCards());
+      document
+        .getElementById("source-filter")
+        ?.addEventListener("change", () => this.filterCards());
+      document
+        .getElementById("archive-filter")
+        ?.addEventListener("change", () => this.filterCards());
+  
       // Close modals on overlay click
-      document.getElementById('new-card-modal')?.addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) this.hideNewCardModal();
-      });
-      document.getElementById('edit-card-modal')?.addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) this.hideEditCardModal();
-      });
+      document
+        .getElementById("new-card-modal")
+        ?.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) this.hideNewCardModal();
+        });
+      document
+        .getElementById("edit-card-modal")
+        ?.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) this.hideEditCardModal();
+        });
     }
-    
+  
     setupCharCounters() {
       const counters = [
-        { input: 'card-front', counter: 'front-char-count' },
-        { input: 'card-back', counter: 'back-char-count' },
-        { input: 'edit-card-front', counter: 'edit-front-char-count' },
-        { input: 'edit-card-back', counter: 'edit-back-char-count' }
+        { input: "card-front", counter: "front-char-count" },
+        { input: "card-back", counter: "back-char-count" },
+        { input: "edit-card-front", counter: "edit-front-char-count" },
+        { input: "edit-card-back", counter: "edit-back-char-count" },
       ];
-      
+  
       counters.forEach(({ input, counter }) => {
         const inputEl = document.getElementById(input);
         const counterEl = document.getElementById(counter);
-        
+  
         if (inputEl && counterEl) {
-          inputEl.addEventListener('input', () => {
+          inputEl.addEventListener("input", () => {
             counterEl.textContent = inputEl.value.length;
           });
         }
       });
     }
-    
+  
     async loadDeck() {
       try {
         // Check authentication first
         await window.authClient.requireAuth();
-        
-        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}`);
-        
+  
+        const response = await window.authClient.authenticatedFetch(
+          `/api/decks/${this.deckId}`,
+        );
+
         if (!response.ok) {
-          throw new Error('Nie udało się załadować decka');
+          throw new Error("Nie udało się załadować decka");
         }
-        
+  
         const deck = await response.json();
         this.renderDeckInfo(deck);
-        
       } catch (error) {
-        console.error('Error loading deck:', error);
-        if (error.message === 'Unauthorized') {
+        console.error("Error loading deck:", error);
+        if (error.message === "Unauthorized") {
           return; // Already redirected to login
         }
-        this.showError('Błąd podczas ładowania decka');
+        this.showError("Błąd podczas ładowania decka");
       }
     }
-    
+  
     async loadCards() {
       try {
-        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards`);
-        
+        const response = await window.authClient.authenticatedFetch(
+          `/api/decks/${this.deckId}/cards`,
+        );
+
         if (!response.ok) {
-          throw new Error('Nie udało się załadować fiszek');
+          throw new Error("Nie udało się załadować fiszek");
         }
-        
+  
         const data = await response.json();
         this.currentCards = data.items;
         this.renderCards(this.currentCards);
-        
       } catch (error) {
-        console.error('Error loading cards:', error);
-        if (error.message === 'Unauthorized') {
+        console.error("Error loading cards:", error);
+        if (error.message === "Unauthorized") {
           return; // Already redirected to login
         }
-        this.showError('Błąd podczas ładowania fiszek');
+        this.showError("Błąd podczas ładowania fiszek");
       }
     }
-    
+  
     renderDeckInfo(deck) {
-      document.getElementById('deck-title').textContent = deck.name;
-      document.getElementById('deck-meta').innerHTML = `
+      document.getElementById("deck-title").textContent = deck.name;
+      document.getElementById("deck-meta").innerHTML = `
         <span class="deck-language">${this.getLanguageName(deck.language_code)}</span>
         <span class="deck-date">Utworzony ${this.formatDate(deck.created_at)}</span>
       `;
     }
-    
+  
     renderCards(cards) {
-      const grid = document.getElementById('cards-grid');
-      
+      const grid = document.getElementById("cards-grid");
+  
       if (cards.length === 0) {
         grid.innerHTML = `
           <div class="empty-state">
@@ -340,11 +366,13 @@ const { id } = Astro.params;
         `;
         return;
       }
-      
-      const html = cards.map(card => `
+  
+      const html = cards
+        .map(
+          (card) => `
         <div class="card-item" data-card-id="${card.id}">
           <div class="card-header">
-            <div class="card-source ${card.source}">${card.source === 'ai' ? 'AI' : 'Ręczna'}</div>
+            <div class="card-source ${card.source}">${card.source === "ai" ? "AI" : "Ręczna"}</div>
             <div class="card-actions">
               <button class="action-btn" onclick="window.deckManager.editCard('${card.id}')">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,234 +401,249 @@ const { id } = Astro.params;
           
           <div class="card-meta">
             <span class="card-date">Utworzona ${this.formatDate(card.created_at)}</span>
-            ${card.due_at ? `<span class="card-due">Kolejna ${this.formatDate(card.due_at)}</span>` : ''}
+            ${card.due_at ? `<span class="card-due">Kolejna ${this.formatDate(card.due_at)}</span>` : ""}
           </div>
         </div>
-      `).join('');
-      
+      `,
+        )
+        .join("");
+  
       grid.innerHTML = html;
     }
-    
+  
     showNewCardModal() {
-      document.getElementById('new-card-modal')?.classList.remove('hidden');
-      document.getElementById('card-front')?.focus();
+      document.getElementById("new-card-modal")?.classList.remove("hidden");
+      document.getElementById("card-front")?.focus();
     }
-    
+  
     hideNewCardModal() {
-      document.getElementById('new-card-modal')?.classList.add('hidden');
-      this.resetForm('new-card-form');
+      document.getElementById("new-card-modal")?.classList.add("hidden");
+      this.resetForm("new-card-form");
     }
-    
+  
     showEditCardModal() {
-      document.getElementById('edit-card-modal')?.classList.remove('hidden');
-      document.getElementById('edit-card-front')?.focus();
+      document.getElementById("edit-card-modal")?.classList.remove("hidden");
+      document.getElementById("edit-card-front")?.focus();
     }
-    
+  
     hideEditCardModal() {
-      document.getElementById('edit-card-modal')?.classList.add('hidden');
-      this.resetForm('edit-card-form');
+      document.getElementById("edit-card-modal")?.classList.add("hidden");
+      this.resetForm("edit-card-form");
     }
-    
+  
     async handleCreateCard(e) {
       e.preventDefault();
-      
+  
       const form = e.target;
       const formData = new FormData(form);
-      
-      const createBtn = document.getElementById('create-card-btn');
-      const btnText = createBtn.querySelector('.btn-text');
-      const btnSpinner = createBtn.querySelector('.btn-spinner');
-      const formMessage = document.getElementById('form-message');
-      
+  
+      const createBtn = document.getElementById("create-card-btn");
+      const btnText = createBtn.querySelector(".btn-text");
+      const btnSpinner = createBtn.querySelector(".btn-spinner");
+      const formMessage = document.getElementById("form-message");
+  
       this.showLoadingState(createBtn, btnText, btnSpinner);
-      formMessage.textContent = '';
-      formMessage.className = 'form-message';
-      
+      formMessage.textContent = "";
+      formMessage.className = "form-message";
+  
       try {
         const cardData = {
-          front: formData.get('front'),
-          back: formData.get('back'),
-          language_code: formData.get('language_code') || undefined
+          front: formData.get("front"),
+          back: formData.get("back"),
+          language_code: formData.get("language_code") || undefined,
         };
-        
-        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards`, {
-          method: 'POST',
-          body: JSON.stringify(cardData)
-        });
-        
+  
+        const response = await window.authClient.authenticatedFetch(
+          `/api/decks/${this.deckId}/cards`,
+          {
+            method: "POST",
+            body: JSON.stringify(cardData),
+          },
+        );
+
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Nie udało się utworzyć fiszki');
+          throw new Error(error.error || "Nie udało się utworzyć fiszki");
         }
-        
-        formMessage.textContent = 'Fiszka została utworzona pomyślnie!';
-        formMessage.className = 'form-message success';
-        
+  
+        formMessage.textContent = "Fiszka została utworzona pomyślnie!";
+        formMessage.className = "form-message success";
+  
         setTimeout(async () => {
           this.hideNewCardModal();
           await this.loadCards();
         }, 1500);
-        
       } catch (error) {
         formMessage.textContent = error.message;
-        formMessage.className = 'form-message error';
+        formMessage.className = "form-message error";
       } finally {
         this.hideLoadingState(createBtn, btnText, btnSpinner);
       }
     }
-    
+  
     async handleUpdateCard(e) {
       e.preventDefault();
-      
+  
       const form = e.target;
       const formData = new FormData(form);
-      const cardId = formData.get('cardId');
-      
-      const updateBtn = document.getElementById('update-card-btn');
-      const btnText = updateBtn.querySelector('.btn-text');
-      const btnSpinner = updateBtn.querySelector('.btn-spinner');
-      const formMessage = document.getElementById('edit-form-message');
-      
+      const cardId = formData.get("cardId");
+  
+      const updateBtn = document.getElementById("update-card-btn");
+      const btnText = updateBtn.querySelector(".btn-text");
+      const btnSpinner = updateBtn.querySelector(".btn-spinner");
+      const formMessage = document.getElementById("edit-form-message");
+  
       this.showLoadingState(updateBtn, btnText, btnSpinner);
-      formMessage.textContent = '';
-      formMessage.className = 'form-message';
-      
+      formMessage.textContent = "";
+      formMessage.className = "form-message";
+  
       try {
         const cardData = {
-          front: formData.get('front'),
-          back: formData.get('back'),
-          language_code: formData.get('language_code') || undefined
+          front: formData.get("front"),
+          back: formData.get("back"),
+          language_code: formData.get("language_code") || undefined,
         };
-        
-        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards/${cardId}`, {
-          method: 'PUT',
-          body: JSON.stringify(cardData)
-        });
-        
+  
+        const response = await window.authClient.authenticatedFetch(
+          `/api/decks/${this.deckId}/cards/${cardId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(cardData),
+          },
+        );
+
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Nie udało się zaktualizować fiszki');
+          throw new Error(error.error || "Nie udało się zaktualizować fiszki");
         }
-        
-        formMessage.textContent = 'Fiszka została zaktualizowana pomyślnie!';
-        formMessage.className = 'form-message success';
-        
+  
+        formMessage.textContent = "Fiszka została zaktualizowana pomyślnie!";
+        formMessage.className = "form-message success";
+  
         setTimeout(async () => {
           this.hideEditCardModal();
           await this.loadCards();
         }, 1500);
-        
       } catch (error) {
         formMessage.textContent = error.message;
-        formMessage.className = 'form-message error';
+        formMessage.className = "form-message error";
       } finally {
         this.hideLoadingState(updateBtn, btnText, btnSpinner);
       }
     }
-    
+  
     editCard(cardId) {
-      const card = this.currentCards.find(c => c.id === cardId);
+      const card = this.currentCards.find((c) => c.id === cardId);
       if (!card) return;
-      
-      document.getElementById('edit-card-id').value = cardId;
-      document.getElementById('edit-card-front').value = card.front;
-      document.getElementById('edit-card-back').value = card.back;
-      document.getElementById('edit-language-code').value = card.language_code || '';
-      
+  
+      document.getElementById("edit-card-id").value = cardId;
+      document.getElementById("edit-card-front").value = card.front;
+      document.getElementById("edit-card-back").value = card.back;
+      document.getElementById("edit-language-code").value =
+        card.language_code || "";
+  
       // Update character counters
-      document.getElementById('edit-front-char-count').textContent = card.front.length;
-      document.getElementById('edit-back-char-count').textContent = card.back.length;
-      
+      document.getElementById("edit-front-char-count").textContent =
+        card.front.length;
+      document.getElementById("edit-back-char-count").textContent =
+        card.back.length;
+  
       this.showEditCardModal();
     }
-    
+  
     async deleteCard(cardId) {
-      if (!confirm('Czy na pewno chcesz usunąć tę fiszkę? Ta operacja jest nieodwracalna.')) {
+      if (
+        !confirm(
+          "Czy na pewno chcesz usunąć tę fiszkę? Ta operacja jest nieodwracalna.",
+        )
+      ) {
         return;
       }
-      
+  
       try {
-        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards/${cardId}`, {
-          method: 'DELETE'
-        });
-        
+        const response = await window.authClient.authenticatedFetch(
+          `/api/decks/${this.deckId}/cards/${cardId}`,
+          {
+            method: "DELETE",
+          },
+        );
+
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Nie udało się usunąć fiszki');
+          throw new Error(error.error || "Nie udało się usunąć fiszki");
         }
-        
+  
         await this.loadCards();
-        
       } catch (error) {
         alert(`Błąd: ${error.message}`);
       }
     }
-    
+  
     filterCards() {
       // Implementation for filtering cards based on search and filters
-      console.log('Filtering cards...');
+      console.log("Filtering cards...");
     }
-    
+  
     showLoadingState(btn, btnText, btnSpinner) {
       btn.disabled = true;
-      btnText.classList.add('hidden');
-      btnSpinner.classList.remove('hidden');
+      btnText.classList.add("hidden");
+      btnSpinner.classList.remove("hidden");
     }
-    
+  
     hideLoadingState(btn, btnText, btnSpinner) {
       btn.disabled = false;
-      btnText.classList.remove('hidden');
-      btnSpinner.classList.add('hidden');
+      btnText.classList.remove("hidden");
+      btnSpinner.classList.add("hidden");
     }
-    
+  
     resetForm(formId) {
       const form = document.getElementById(formId);
       form.reset();
-      
+  
       // Reset character counters
-      const counters = form.querySelectorAll('.char-counter span');
-      counters.forEach(counter => counter.textContent = '0');
-      
+      const counters = form.querySelectorAll(".char-counter span");
+      counters.forEach((counter) => (counter.textContent = "0"));
+  
       // Reset form message
-      const formMessage = form.querySelector('.form-message');
+      const formMessage = form.querySelector(".form-message");
       if (formMessage) {
-        formMessage.textContent = '';
-        formMessage.className = 'form-message';
+        formMessage.textContent = "";
+        formMessage.className = "form-message";
       }
     }
-    
+  
     getLanguageName(code) {
       const languages = {
-        pl: 'Polski',
-        en: 'Angielski',
-        de: 'Niemiecki',
-        fr: 'Francuski',
-        es: 'Hiszpański'
+        pl: "Polski",
+        en: "Angielski",
+        de: "Niemiecki",
+        fr: "Francuski",
+        es: "Hiszpański",
       };
-      return languages[code] || 'Nie określono';
+      return languages[code] || "Nie określono";
     }
-    
+  
     formatDate(dateString) {
       const date = new Date(dateString);
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - date.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 1) return 'wczoraj';
+  
+      if (diffDays === 1) return "wczoraj";
       if (diffDays < 7) return `${diffDays} dni temu`;
       if (diffDays < 30) return `${Math.floor(diffDays / 7)} tygodni temu`;
-      
-      return date.toLocaleDateString('pl-PL');
+  
+      return date.toLocaleDateString("pl-PL");
     }
-    
+  
     escapeHtml(text) {
-      const div = document.createElement('div');
+      const div = document.createElement("div");
       div.textContent = text;
       return div.innerHTML;
     }
-    
+  
     showError(message) {
-      const grid = document.getElementById('cards-grid');
+      const grid = document.getElementById("cards-grid");
       grid.innerHTML = `
         <div class="error-state">
           <p>${message}</p>
@@ -611,7 +654,7 @@ const { id } = Astro.params;
   }
   
   // Initialize and make available globally
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener("DOMContentLoaded", () => {
     window.deckManager = new DeckDetailManager(deckId);
   });
 </script>

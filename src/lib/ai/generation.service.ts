@@ -1,13 +1,17 @@
 /**
  * AI Generation Service
- * 
+ *
  * Handles background processing of AI generation jobs using OpenRouter
  * Implements the business logic for creating flashcard suggestions from source text
  */
 
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../../db/database.types';
-import { createOpenRouterService, type ChatMessage, type JsonSchema } from './openrouter.service';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../../../database/types/database.types";
+import {
+  createOpenRouterService,
+  type ChatMessage,
+  type JsonSchema,
+} from "./openrouter.service";
 
 // Types for the service
 interface GenerationPayload {
@@ -29,9 +33,11 @@ interface FlashcardSuggestion {
  * For MVP: fire-and-forget with setTimeout
  * TODO: Replace with proper queue system (e.g., Inngest, BullMQ) for production
  */
-export async function enqueueGeneration(payload: GenerationPayload): Promise<void> {
+export async function enqueueGeneration(
+  payload: GenerationPayload,
+): Promise<void> {
   // Log the generation request for observability
-  console.log('Enqueuing AI generation:', {
+  console.log("Enqueuing AI generation:", {
     generationId: payload.generationId,
     userId: payload.userId,
     model: payload.model,
@@ -42,7 +48,7 @@ export async function enqueueGeneration(payload: GenerationPayload): Promise<voi
   // In production, this would be a proper queue system
   setTimeout(() => {
     runAIGeneration(payload).catch((error) => {
-      console.error('Background AI generation failed:', {
+      console.error("Background AI generation failed:", {
         generationId: payload.generationId,
         error: error.message,
         stack: error.stack,
@@ -55,7 +61,9 @@ export async function enqueueGeneration(payload: GenerationPayload): Promise<voi
  * Main background worker function for AI generation
  * Handles the complete flow from updating status to calling OpenRouter and storing results
  */
-export async function runAIGeneration(payload: GenerationPayload): Promise<void> {
+export async function runAIGeneration(
+  payload: GenerationPayload,
+): Promise<void> {
   const startTime = Date.now();
   let supabase: ReturnType<typeof createClient<Database>>;
 
@@ -64,7 +72,7 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
     supabase = createServiceRoleClient();
 
     // 1. Update generation status to 'running'
-    await updateGenerationStatus(supabase, payload.generationId, 'running');
+    await updateGenerationStatus(supabase, payload.generationId, "running");
 
     // 2. Get the generation details
     const generation = await getGeneration(supabase, payload.generationId);
@@ -78,7 +86,7 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
       openRouterService,
       generation.source_text,
       payload.model,
-      payload.promptVersion || 'v1'
+      payload.promptVersion || "v1",
     );
 
     // 4. Parse and validate the AI response
@@ -106,17 +114,16 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
       ai_metadata: metadata,
     });
 
-    console.log('AI generation completed successfully:', {
+    console.log("AI generation completed successfully:", {
       generationId: payload.generationId,
       duration: endTime - startTime,
       suggestionsCount: suggestions.length,
     });
-
   } catch (error) {
     // Handle errors by updating generation status to 'failed'
     const endTime = Date.now();
     const errorData = {
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
       duration_ms: endTime - startTime,
       stack: error instanceof Error ? error.stack : undefined,
@@ -126,7 +133,7 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
       await updateGenerationFailure(supabase, payload.generationId, errorData);
     }
 
-    console.error('AI generation failed:', {
+    console.error("AI generation failed:", {
       generationId: payload.generationId,
       error: errorData,
     });
@@ -144,7 +151,7 @@ function createServiceRoleClient() {
   const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing Supabase configuration for service role');
+    throw new Error("Missing Supabase configuration for service role");
   }
 
   return createClient<Database>(supabaseUrl, supabaseServiceKey, {
@@ -158,12 +165,12 @@ function createServiceRoleClient() {
 async function updateGenerationStatus(
   supabase: ReturnType<typeof createClient<Database>>,
   generationId: string,
-  status: string
+  status: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('ai_generations')
+    .from("ai_generations")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', generationId);
+    .eq("id", generationId);
 
   if (error) {
     throw new Error(`Failed to update generation status: ${error.message}`);
@@ -175,12 +182,12 @@ async function updateGenerationStatus(
  */
 async function getGeneration(
   supabase: ReturnType<typeof createClient<Database>>,
-  generationId: string
+  generationId: string,
 ) {
   const { data, error } = await supabase
-    .from('ai_generations')
-    .select('id, source_text, model, prompt_version')
-    .eq('id', generationId)
+    .from("ai_generations")
+    .select("id, source_text, model, prompt_version")
+    .eq("id", generationId)
     .single();
 
   if (error) {
@@ -197,27 +204,35 @@ async function callOpenRouterWithService(
   openRouterService: ReturnType<typeof createOpenRouterService>,
   sourceText: string,
   model?: string,
-  promptVersion: string = 'v1'
-): Promise<{ json: unknown; model?: string; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }> {
+  promptVersion = "v1",
+): Promise<{
+  json: unknown;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}> {
   // Build messages
   const systemMessage = openRouterService.buildSystemMessage(promptVersion);
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: sourceText },
+    { role: "system", content: systemMessage },
+    { role: "user", content: sourceText },
   ];
 
   // Define JSON schema for flashcard suggestions
   const flashcardsSchema: JsonSchema = {
-    name: 'flashcards_schema',
+    name: "flashcards_schema",
     schema: {
-      type: 'array',
+      type: "array",
       items: {
-        type: 'object',
-        required: ['front', 'back'],
+        type: "object",
+        required: ["front", "back"],
         additionalProperties: false,
         properties: {
-          front: { type: 'string', minLength: 1, maxLength: 2000 },
-          back: { type: 'string', minLength: 1, maxLength: 2000 },
+          front: { type: "string", minLength: 1, maxLength: 2000 },
+          back: { type: "string", minLength: 1, maxLength: 2000 },
         },
       },
       minItems: 3,
@@ -243,17 +258,17 @@ async function callOpenRouterWithService(
  */
 function parseStructuredResponse(json: unknown): FlashcardSuggestion[] {
   if (!Array.isArray(json)) {
-    throw new Error('AI response is not an array');
+    throw new Error("AI response is not an array");
   }
 
   // Validate and sanitize suggestions
   const suggestions: FlashcardSuggestion[] = json
     .filter((item): item is FlashcardSuggestion => {
       return (
-        typeof item === 'object' &&
+        typeof item === "object" &&
         item !== null &&
-        typeof item.front === 'string' &&
-        typeof item.back === 'string' &&
+        typeof item.front === "string" &&
+        typeof item.back === "string" &&
         item.front.length >= 1 &&
         item.front.length <= 2000 &&
         item.back.length >= 1 &&
@@ -266,7 +281,7 @@ function parseStructuredResponse(json: unknown): FlashcardSuggestion[] {
     }));
 
   if (suggestions.length === 0) {
-    throw new Error('No valid suggestions found in AI response');
+    throw new Error("No valid suggestions found in AI response");
   }
 
   return suggestions;
@@ -281,20 +296,20 @@ async function insertSuggestions(
     generationId: string;
     userId: string;
     suggestions: FlashcardSuggestion[];
-  }
+  },
 ): Promise<void> {
   const suggestionsData = params.suggestions.map((suggestion) => ({
     user_id: params.userId,
     generation_id: params.generationId,
     front: suggestion.front,
     back: suggestion.back,
-    status: 'proposed' as const,
+    status: "proposed" as const,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }));
 
   const { error } = await supabase
-    .from('ai_suggestions')
+    .from("ai_suggestions")
     .insert(suggestionsData);
 
   if (error) {
@@ -312,18 +327,18 @@ async function updateGenerationSuccess(
     tokens_input: number | null;
     tokens_output: number | null;
     ai_metadata: Record<string, unknown>;
-  }
+  },
 ): Promise<void> {
   const { error } = await supabase
-    .from('ai_generations')
+    .from("ai_generations")
     .update({
-      status: 'succeeded',
+      status: "succeeded",
       tokens_input: data.tokens_input,
       tokens_output: data.tokens_output,
       ai_metadata: data.ai_metadata,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', generationId);
+    .eq("id", generationId);
 
   if (error) {
     throw new Error(`Failed to update generation success: ${error.message}`);
@@ -336,19 +351,19 @@ async function updateGenerationSuccess(
 async function updateGenerationFailure(
   supabase: ReturnType<typeof createClient<Database>>,
   generationId: string,
-  errorData: Record<string, unknown>
+  errorData: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await supabase
-    .from('ai_generations')
+    .from("ai_generations")
     .update({
-      status: 'failed',
+      status: "failed",
       error: errorData,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', generationId);
+    .eq("id", generationId);
 
   if (error) {
-    console.error('Failed to update generation failure status:', error);
+    console.error("Failed to update generation failure status:", error);
     // Don't throw here to avoid masking the original error
   }
 }

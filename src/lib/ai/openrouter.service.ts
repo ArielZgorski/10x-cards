@@ -1,102 +1,102 @@
 /**
  * OpenRouter Service
- * 
+ *
  * Handles communication with OpenRouter API for LLM inference (chat completions).
  * Provides structured JSON responses and comprehensive error handling.
  */
 
 // Types for OpenRouter API parameters
-export type OpenRouterParams = {
+export interface OpenRouterParams {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
   repetition_penalty?: number;
   stream?: boolean;
-};
+}
 
 // Configuration for OpenRouter service
-export type OpenRouterConfig = {
+export interface OpenRouterConfig {
   apiKey: string; // from import.meta.env.OPENROUTER_API_KEY
   baseUrl?: string; // defaults to 'https://openrouter.ai/api/v1/chat/completions'
   defaultModel?: string; // e.g. from env: DEFAULT_OPENROUTER_MODEL
   defaultParams?: OpenRouterParams;
   appReferer: string; // full URL of production app
   appTitle: string; // visible app name
-};
+}
 
 // Message structure for chat completions
-export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
   content: string;
-};
+}
 
 // Response format for structured JSON responses
-export type ResponseFormat = {
-  type: 'json_schema';
+export interface ResponseFormat {
+  type: "json_schema";
   json_schema: {
     name: string;
     strict: true;
     schema: unknown;
   };
-};
+}
 
 // Options for chat method
-export type ChatOptions = {
+export interface ChatOptions {
   model?: string;
   params?: OpenRouterParams;
   responseFormat?: ResponseFormat;
   timeoutMs?: number;
-};
+}
 
 // Options for chatJson method
-export type ChatJsonOptions = {
+export interface ChatJsonOptions {
   model?: string;
   params?: OpenRouterParams;
   timeoutMs?: number;
-};
+}
 
 // Usage statistics from OpenRouter
-export type Usage = {
+export interface Usage {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
-};
+}
 
 // Chat response structure
-export type ChatResponse = {
+export interface ChatResponse {
   content: string;
   model?: string;
   usage?: Usage;
-};
+}
 
 // JSON chat response structure
-export type ChatJsonResponse = {
+export interface ChatJsonResponse {
   json: unknown;
   raw: string;
   model?: string;
   usage?: Usage;
-};
+}
 
 // JSON schema definition
-export type JsonSchema = {
+export interface JsonSchema {
   name: string;
   schema: unknown;
-};
+}
 
 // Internal OpenRouter API response structure
 interface OpenRouterApiResponse {
-  choices: Array<{
+  choices: {
     message: {
       content: string;
     };
-  }>;
+  }[];
   model?: string;
   usage?: Usage;
 }
 
 /**
  * OpenRouter Service Class
- * 
+ *
  * Manages communication with OpenRouter API for chat completions.
  * Supports both regular and structured JSON responses.
  */
@@ -104,13 +104,13 @@ export class OpenRouterService {
   constructor(private readonly config: OpenRouterConfig) {
     // Validate required configuration
     if (!config.apiKey) {
-      throw new Error('OpenRouter API key is required');
+      throw new Error("OpenRouter API key is required");
     }
     if (!config.appReferer) {
-      throw new Error('App referer is required for OpenRouter identification');
+      throw new Error("App referer is required for OpenRouter identification");
     }
     if (!config.appTitle) {
-      throw new Error('App title is required for OpenRouter identification');
+      throw new Error("App title is required for OpenRouter identification");
     }
   }
 
@@ -120,9 +120,9 @@ export class OpenRouterService {
   private _headers() {
     return {
       Authorization: `Bearer ${this.config.apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': this.config.appReferer,
-      'X-Title': this.config.appTitle,
+      "Content-Type": "application/json",
+      "HTTP-Referer": this.config.appReferer,
+      "X-Title": this.config.appTitle,
     } as const;
   }
 
@@ -130,7 +130,9 @@ export class OpenRouterService {
    * Get OpenRouter API endpoint URL
    */
   private _endpoint(): string {
-    return this.config.baseUrl ?? 'https://openrouter.ai/api/v1/chat/completions';
+    return (
+      this.config.baseUrl ?? "https://openrouter.ai/api/v1/chat/completions"
+    );
   }
 
   /**
@@ -143,14 +145,18 @@ export class OpenRouterService {
     responseFormat?: ResponseFormat;
   }) {
     const { model, messages, params, responseFormat } = args;
-    
+
     return {
-      model: model ?? this.config.defaultModel ?? 'openai/gpt-3.5-turbo',
+      model: model ?? this.config.defaultModel ?? "openai/gpt-3.5-turbo",
       messages,
-      temperature: params?.temperature ?? this.config.defaultParams?.temperature ?? 0.7,
-      max_tokens: params?.max_tokens ?? this.config.defaultParams?.max_tokens ?? 2000,
+      temperature:
+        params?.temperature ?? this.config.defaultParams?.temperature ?? 0.7,
+      max_tokens:
+        params?.max_tokens ?? this.config.defaultParams?.max_tokens ?? 2000,
       top_p: params?.top_p ?? this.config.defaultParams?.top_p,
-      repetition_penalty: params?.repetition_penalty ?? this.config.defaultParams?.repetition_penalty,
+      repetition_penalty:
+        params?.repetition_penalty ??
+        this.config.defaultParams?.repetition_penalty,
       stream: params?.stream ?? false,
       ...(responseFormat ? { response_format: responseFormat } : {}),
     };
@@ -159,18 +165,22 @@ export class OpenRouterService {
   /**
    * Fetch with timeout and abort controller
    */
-  private async _fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 30000): Promise<Response> {
+  private async _fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs = 30000,
+  ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    
+
     try {
-      const response = await fetch(url, { 
-        ...init, 
-        signal: controller.signal 
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
       });
       return response;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`Request timeout after ${timeoutMs}ms`);
       }
       throw error;
@@ -185,28 +195,32 @@ export class OpenRouterService {
   private async _retryWithBackoff<T>(
     operation: () => Promise<T>,
     maxRetries = 3,
-    baseDelayMs = 250
+    baseDelayMs = 250,
   ): Promise<T> {
     let lastError: Error;
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Don't retry on last attempt
         if (attempt === maxRetries) {
           break;
         }
-        
+
         // Only retry on specific transient errors
         if (this._shouldRetry(lastError)) {
-          const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100; // Add jitter
-          console.warn(`OpenRouter request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1}):`, {
-            error: lastError.message,
-            attempt: attempt + 1,
-          });
+          const delay =
+            baseDelayMs * Math.pow(2, attempt) + Math.random() * 100; // Add jitter
+          console.warn(
+            `OpenRouter request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1}):`,
+            {
+              error: lastError.message,
+              attempt: attempt + 1,
+            },
+          );
           await this._sleep(delay);
         } else {
           // Non-retryable error, fail immediately
@@ -214,7 +228,7 @@ export class OpenRouterService {
         }
       }
     }
-    
+
     throw lastError!;
   }
 
@@ -223,22 +237,27 @@ export class OpenRouterService {
    */
   private _shouldRetry(error: Error): boolean {
     const message = error.message.toLowerCase();
-    
+
     // Retry on rate limits (429)
-    if (message.includes('429') || message.includes('rate limit')) {
+    if (message.includes("429") || message.includes("rate limit")) {
       return true;
     }
-    
+
     // Retry on server errors (5xx)
-    if (message.includes('500') || message.includes('502') || message.includes('503') || message.includes('504')) {
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504")
+    ) {
       return true;
     }
-    
+
     // Retry on network timeouts
-    if (message.includes('timeout') || message.includes('network')) {
+    if (message.includes("timeout") || message.includes("network")) {
       return true;
     }
-    
+
     // Don't retry on client errors (4xx except 429), auth errors, etc.
     return false;
   }
@@ -247,29 +266,33 @@ export class OpenRouterService {
    * Sleep utility for retry delays
    */
   private _sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Parse OpenRouter API response and handle errors
    */
-  private async _parseOpenRouterJson(response: Response): Promise<{ content: string; model?: string; usage?: Usage }> {
+  private async _parseOpenRouterJson(
+    response: Response,
+  ): Promise<{ content: string; model?: string; usage?: Usage }> {
     if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`OpenRouter error ${response.status}: ${text || response.statusText}`);
+      const text = await response.text().catch(() => "");
+      throw new Error(
+        `OpenRouter error ${response.status}: ${text || response.statusText}`,
+      );
     }
 
     const data: OpenRouterApiResponse = await response.json();
     const content: string | undefined = data?.choices?.[0]?.message?.content;
-    
+
     if (!content) {
-      throw new Error('No content in OpenRouter response');
+      throw new Error("No content in OpenRouter response");
     }
 
-    return { 
-      content, 
-      model: data.model, 
-      usage: data.usage 
+    return {
+      content,
+      model: data.model,
+      usage: data.usage,
     } as const;
   }
 
@@ -284,7 +307,7 @@ export class OpenRouterService {
       // If that fails, try to extract the first JSON block (array or object)
       const match = content.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
       if (!match) {
-        throw new Error('Failed to locate JSON in content');
+        throw new Error("Failed to locate JSON in content");
       }
       return JSON.parse(match[0]);
     }
@@ -295,9 +318,9 @@ export class OpenRouterService {
    */
   buildSystemMessage(version: string): string {
     switch (version) {
-      case 'v2':
+      case "v2":
         return this._buildSystemPromptV2();
-      case 'v1':
+      case "v1":
       default:
         return this._buildSystemPromptV1();
     }
@@ -380,14 +403,14 @@ Return exclusively a JSON array conforming to the provided schema. Each flashcar
 
   /**
    * Execute chat completion with OpenRouter API
-   * 
+   *
    * @param messages - Array of chat messages
    * @param options - Optional parameters for the request
    * @returns Promise resolving to chat response with content, model, and usage
    */
   async chat(
     messages: ChatMessage[],
-    options?: ChatOptions
+    options?: ChatOptions,
   ): Promise<ChatResponse> {
     const body = this._requestBody({
       model: options?.model,
@@ -400,11 +423,11 @@ Return exclusively a JSON array conforming to the provided schema. Each flashcar
       const response = await this._fetchWithTimeout(
         this._endpoint(),
         {
-          method: 'POST',
+          method: "POST",
           headers: this._headers(),
           body: JSON.stringify(body),
         },
-        options?.timeoutMs
+        options?.timeoutMs,
       );
 
       return this._parseOpenRouterJson(response);
@@ -413,7 +436,7 @@ Return exclusively a JSON array conforming to the provided schema. Each flashcar
 
   /**
    * Execute chat completion with enforced JSON schema response
-   * 
+   *
    * @param messages - Array of chat messages
    * @param jsonSchema - JSON schema definition for structured response
    * @param options - Optional parameters for the request
@@ -422,10 +445,10 @@ Return exclusively a JSON array conforming to the provided schema. Each flashcar
   async chatJson(
     messages: ChatMessage[],
     jsonSchema: JsonSchema,
-    options?: ChatJsonOptions
+    options?: ChatJsonOptions,
   ): Promise<ChatJsonResponse> {
     const responseFormat: ResponseFormat = {
-      type: 'json_schema',
+      type: "json_schema",
       json_schema: {
         name: jsonSchema.name,
         strict: true,
@@ -457,16 +480,17 @@ Return exclusively a JSON array conforming to the provided schema. Each flashcar
 export function createOpenRouterService(): OpenRouterService {
   const apiKey = import.meta.env.OPENROUTER_API_KEY;
   const defaultModel = import.meta.env.DEFAULT_OPENROUTER_MODEL;
-  const appReferer = import.meta.env.APP_REFERER || 'https://10x-cards.com';
-  const appTitle = import.meta.env.APP_TITLE || '10x Cards - Flashcard Generator';
+  const appReferer = import.meta.env.APP_REFERER || "https://10x-cards.com";
+  const appTitle =
+    import.meta.env.APP_TITLE || "10x Cards - Flashcard Generator";
 
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY environment variable is required');
+    throw new Error("OPENROUTER_API_KEY environment variable is required");
   }
 
   const config: OpenRouterConfig = {
     apiKey,
-    defaultModel: defaultModel || 'openai/gpt-3.5-turbo',
+    defaultModel: defaultModel || "openai/gpt-3.5-turbo",
     appReferer,
     appTitle,
     defaultParams: {

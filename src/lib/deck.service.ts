@@ -1,13 +1,18 @@
 /**
  * Deck Service
- * 
+ *
  * Handles business logic for deck CRUD operations and deck-related
  * database operations.
  */
 
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../db/database.types';
-import type { DeckDTO, CreateDeckCommand, UpdateDeckCommand, UUID } from '../types';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../../database/types/database.types";
+import type {
+  DeckDTO,
+  CreateDeckCommand,
+  UpdateDeckCommand,
+  UUID,
+} from "../types";
 
 type SupabaseClient = ReturnType<typeof createClient<Database>>;
 
@@ -18,9 +23,9 @@ function generateSlug(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters except hyphens
-    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^\w\s-]/g, "") // Remove special characters except hyphens
+    .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
 }
 
 /**
@@ -30,25 +35,25 @@ async function ensureUniqueSlug(
   supabase: SupabaseClient,
   userId: UUID,
   baseSlug: string,
-  excludeId?: UUID
+  excludeId?: UUID,
 ): Promise<string> {
   let slug = baseSlug;
   let counter = 1;
 
   while (true) {
     let query = supabase
-      .from('decks')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('slug', slug);
+      .from("decks")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("slug", slug);
 
     if (excludeId) {
-      query = query.neq('id', excludeId);
+      query = query.neq("id", excludeId);
     }
 
     const { data, error } = await query.single();
 
-    if (error && error.code === 'PGRST116') {
+    if (error && error.code === "PGRST116") {
       // No existing deck with this slug
       return slug;
     }
@@ -69,13 +74,13 @@ async function ensureUniqueSlug(
 export async function createDeck(
   supabase: SupabaseClient,
   userId: UUID,
-  command: CreateDeckCommand
+  command: CreateDeckCommand,
 ): Promise<DeckDTO> {
   const baseSlug = command.slug || generateSlug(command.name);
   const uniqueSlug = await ensureUniqueSlug(supabase, userId, baseSlug);
 
   const { data, error } = await supabase
-    .from('decks')
+    .from("decks")
     .insert({
       user_id: userId,
       name: command.name,
@@ -104,33 +109,38 @@ export async function getDecks(
     per_page?: number;
     is_archived?: boolean;
     search?: string;
-    sort?: 'created_at' | 'updated_at' | 'name';
-    order?: 'asc' | 'desc';
-  } = {}
-): Promise<{ items: DeckDTO[]; total: number; page: number; per_page: number }> {
+    sort?: "created_at" | "updated_at" | "name";
+    order?: "asc" | "desc";
+  } = {},
+): Promise<{
+  items: DeckDTO[];
+  total: number;
+  page: number;
+  per_page: number;
+}> {
   const {
     page = 1,
     per_page = 20,
     is_archived = false,
     search,
-    sort = 'updated_at',
-    order = 'desc'
+    sort = "updated_at",
+    order = "desc",
   } = options;
 
   const limit = Math.min(per_page, 100);
   const offset = (page - 1) * limit;
 
   let query = supabase
-    .from('decks')
-    .select('*', { count: 'exact' })
-    .eq('user_id', userId)
-    .eq('is_archived', is_archived);
+    .from("decks")
+    .select("*", { count: "exact" })
+    .eq("user_id", userId)
+    .eq("is_archived", is_archived);
 
   if (search) {
-    query = query.ilike('name', `%${search}%`);
+    query = query.ilike("name", `%${search}%`);
   }
 
-  query = query.order(sort, { ascending: order === 'asc' });
+  query = query.order(sort, { ascending: order === "asc" });
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
@@ -143,7 +153,7 @@ export async function getDecks(
     items: (data || []).map(mapDeckEntityToDTO),
     total: count || 0,
     page,
-    per_page: limit
+    per_page: limit,
   };
 }
 
@@ -153,17 +163,17 @@ export async function getDecks(
 export async function getDeckById(
   supabase: SupabaseClient,
   deckId: UUID,
-  userId: UUID
+  userId: UUID,
 ): Promise<DeckDTO | null> {
   const { data, error } = await supabase
-    .from('decks')
+    .from("decks")
     .select()
-    .eq('id', deckId)
-    .eq('user_id', userId)
+    .eq("id", deckId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null; // Not found
     }
     throw new Error(`Failed to get deck: ${error.message}`);
@@ -179,27 +189,30 @@ export async function updateDeck(
   supabase: SupabaseClient,
   deckId: UUID,
   userId: UUID,
-  command: UpdateDeckCommand
+  command: UpdateDeckCommand,
 ): Promise<DeckDTO> {
   const updates: any = {};
 
   if (command.name !== undefined) updates.name = command.name;
-  if (command.language_code !== undefined) updates.language_code = command.language_code;
-  if (command.is_archived !== undefined) updates.is_archived = command.is_archived;
+  if (command.language_code !== undefined)
+    updates.language_code = command.language_code;
+  if (command.is_archived !== undefined)
+    updates.is_archived = command.is_archived;
 
   // Handle slug update
   if (command.slug !== undefined || command.name !== undefined) {
-    const newSlug = command.slug || (command.name ? generateSlug(command.name) : undefined);
+    const newSlug =
+      command.slug || (command.name ? generateSlug(command.name) : undefined);
     if (newSlug) {
       updates.slug = await ensureUniqueSlug(supabase, userId, newSlug, deckId);
     }
   }
 
   const { data, error } = await supabase
-    .from('decks')
+    .from("decks")
     .update(updates)
-    .eq('id', deckId)
-    .eq('user_id', userId)
+    .eq("id", deckId)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -216,13 +229,13 @@ export async function updateDeck(
 export async function archiveDeck(
   supabase: SupabaseClient,
   deckId: UUID,
-  userId: UUID
+  userId: UUID,
 ): Promise<void> {
   const { error } = await supabase
-    .from('decks')
+    .from("decks")
     .update({ is_archived: true })
-    .eq('id', deckId)
-    .eq('user_id', userId);
+    .eq("id", deckId)
+    .eq("user_id", userId);
 
   if (error) {
     throw new Error(`Failed to archive deck: ${error.message}`);
@@ -235,7 +248,7 @@ export async function archiveDeck(
 export async function restoreDeck(
   supabase: SupabaseClient,
   deckId: UUID,
-  userId: UUID
+  userId: UUID,
 ): Promise<DeckDTO> {
   return updateDeck(supabase, deckId, userId, { is_archived: false });
 }
@@ -246,13 +259,13 @@ export async function restoreDeck(
 export async function hardDeleteDeck(
   supabase: SupabaseClient,
   deckId: UUID,
-  userId: UUID
+  userId: UUID,
 ): Promise<void> {
   const { error } = await supabase
-    .from('decks')
+    .from("decks")
     .delete()
-    .eq('id', deckId)
-    .eq('user_id', userId);
+    .eq("id", deckId)
+    .eq("user_id", userId);
 
   if (error) {
     throw new Error(`Failed to delete deck: ${error.message}`);
@@ -262,7 +275,9 @@ export async function hardDeleteDeck(
 /**
  * Map database entity to DTO
  */
-function mapDeckEntityToDTO(entity: Database['public']['Tables']['decks']['Row']): DeckDTO {
+function mapDeckEntityToDTO(
+  entity: Database["public"]["Tables"]["decks"]["Row"],
+): DeckDTO {
   return {
     id: entity.id,
     name: entity.name,
