@@ -1,0 +1,1042 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+
+const { id } = Astro.params;
+---
+
+<AppLayout title="Szczegóły decka - 10x Cards" currentPage="decks">
+  <div class="deck-detail-page">
+    <div class="page-header">
+      <div class="header-left">
+        <button id="back-btn" class="btn btn-secondary back-btn">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          Powrót
+        </button>
+        <div class="deck-info">
+          <h1 class="deck-title" id="deck-title">Ładowanie...</h1>
+          <div class="deck-meta" id="deck-meta"></div>
+        </div>
+      </div>
+      <button id="new-card-btn" class="btn btn-primary">
+        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Nowa fiszka
+      </button>
+    </div>
+    
+    <div class="deck-content">
+      <div class="cards-filters">
+        <div class="filters-row">
+          <input type="text" id="search-input" placeholder="Szukaj fiszek..." class="search-input">
+          <select id="source-filter" class="filter-select">
+            <option value="">Wszystkie źródła</option>
+            <option value="manual">Ręczne</option>
+            <option value="ai">AI</option>
+          </select>
+          <select id="archive-filter" class="filter-select">
+            <option value="false">Aktywne</option>
+            <option value="true">Zarchiwizowane</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="cards-grid" id="cards-grid">
+        <div class="loading-state">
+          <div class="loading-spinner">
+            <svg class="spinner" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+              <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+            </svg>
+          </div>
+          <p>Ładowanie fiszek...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- New Card Modal -->
+  <div class="modal-overlay hidden" id="new-card-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Nowa fiszka</h2>
+        <button class="modal-close" id="close-modal">×</button>
+      </div>
+      
+      <form id="new-card-form" class="modal-form">
+        <div class="form-group">
+          <label for="card-front">Przód fiszki</label>
+          <textarea 
+            id="card-front" 
+            name="front" 
+            required 
+            placeholder="Wprowadź pytanie lub pojęcie..."
+            rows="3"
+            maxlength="2000"
+          ></textarea>
+          <div class="char-counter">
+            <span id="front-char-count">0</span> / 2000
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="card-back">Tył fiszki</label>
+          <textarea 
+            id="card-back" 
+            name="back" 
+            required 
+            placeholder="Wprowadź odpowiedź lub wyjaśnienie..."
+            rows="4"
+            maxlength="2000"
+          ></textarea>
+          <div class="char-counter">
+            <span id="back-char-count">0</span> / 2000
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="language-code">Język (opcjonalnie)</label>
+          <select id="language-code" name="language_code">
+            <option value="">Wybierz język</option>
+            <option value="pl">Polski</option>
+            <option value="en">Angielski</option>
+            <option value="de">Niemiecki</option>
+            <option value="fr">Francuski</option>
+            <option value="es">Hiszpański</option>
+          </select>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-btn">Anuluj</button>
+          <button type="submit" class="btn btn-primary" id="create-card-btn">
+            <span class="btn-text">Utwórz fiszkę</span>
+            <span class="btn-spinner hidden">
+              <svg class="spinner" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+                <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+        
+        <div class="form-message" id="form-message"></div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Edit Card Modal -->
+  <div class="modal-overlay hidden" id="edit-card-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edytuj fiszkę</h2>
+        <button class="modal-close" id="close-edit-modal">×</button>
+      </div>
+      
+      <form id="edit-card-form" class="modal-form">
+        <input type="hidden" id="edit-card-id" name="cardId">
+        
+        <div class="form-group">
+          <label for="edit-card-front">Przód fiszki</label>
+          <textarea 
+            id="edit-card-front" 
+            name="front" 
+            required 
+            rows="3"
+            maxlength="2000"
+          ></textarea>
+          <div class="char-counter">
+            <span id="edit-front-char-count">0</span> / 2000
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-card-back">Tył fiszki</label>
+          <textarea 
+            id="edit-card-back" 
+            name="back" 
+            required 
+            rows="4"
+            maxlength="2000"
+          ></textarea>
+          <div class="char-counter">
+            <span id="edit-back-char-count">0</span> / 2000
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-language-code">Język (opcjonalnie)</label>
+          <select id="edit-language-code" name="language_code">
+            <option value="">Wybierz język</option>
+            <option value="pl">Polski</option>
+            <option value="en">Angielski</option>
+            <option value="de">Niemiecki</option>
+            <option value="fr">Francuski</option>
+            <option value="es">Hiszpański</option>
+          </select>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-edit-btn">Anuluj</button>
+          <button type="submit" class="btn btn-primary" id="update-card-btn">
+            <span class="btn-text">Zapisz zmiany</span>
+            <span class="btn-spinner hidden">
+              <svg class="spinner" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+                <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+        
+        <div class="form-message" id="edit-form-message"></div>
+      </form>
+    </div>
+  </div>
+</AppLayout>
+
+<script define:vars={{ deckId: id }}>
+  // Import auth helpers
+  import('/src/lib/auth/auth-client.ts').then(authModule => {
+    window.authClient = authModule;
+    new DeckDetailManager(deckId);
+  });
+
+  class DeckDetailManager {
+    constructor(deckId) {
+      this.deckId = deckId;
+      this.currentCards = [];
+      this.init();
+    }
+    
+    async init() {
+      this.setupEventListeners();
+      await this.loadDeck();
+      await this.loadCards();
+    }
+    
+    setupEventListeners() {
+      // Back button
+      document.getElementById('back-btn')?.addEventListener('click', () => {
+        window.location.href = '/decks';
+      });
+      
+      // New card modal
+      document.getElementById('new-card-btn')?.addEventListener('click', () => this.showNewCardModal());
+      document.getElementById('close-modal')?.addEventListener('click', () => this.hideNewCardModal());
+      document.getElementById('cancel-btn')?.addEventListener('click', () => this.hideNewCardModal());
+      
+      // Edit card modal
+      document.getElementById('close-edit-modal')?.addEventListener('click', () => this.hideEditCardModal());
+      document.getElementById('cancel-edit-btn')?.addEventListener('click', () => this.hideEditCardModal());
+      
+      // Form submissions
+      document.getElementById('new-card-form')?.addEventListener('submit', (e) => this.handleCreateCard(e));
+      document.getElementById('edit-card-form')?.addEventListener('submit', (e) => this.handleUpdateCard(e));
+      
+      // Character counters
+      this.setupCharCounters();
+      
+      // Filters
+      document.getElementById('search-input')?.addEventListener('input', () => this.filterCards());
+      document.getElementById('source-filter')?.addEventListener('change', () => this.filterCards());
+      document.getElementById('archive-filter')?.addEventListener('change', () => this.filterCards());
+      
+      // Close modals on overlay click
+      document.getElementById('new-card-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) this.hideNewCardModal();
+      });
+      document.getElementById('edit-card-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) this.hideEditCardModal();
+      });
+    }
+    
+    setupCharCounters() {
+      const counters = [
+        { input: 'card-front', counter: 'front-char-count' },
+        { input: 'card-back', counter: 'back-char-count' },
+        { input: 'edit-card-front', counter: 'edit-front-char-count' },
+        { input: 'edit-card-back', counter: 'edit-back-char-count' }
+      ];
+      
+      counters.forEach(({ input, counter }) => {
+        const inputEl = document.getElementById(input);
+        const counterEl = document.getElementById(counter);
+        
+        if (inputEl && counterEl) {
+          inputEl.addEventListener('input', () => {
+            counterEl.textContent = inputEl.value.length;
+          });
+        }
+      });
+    }
+    
+    async loadDeck() {
+      try {
+        // Check authentication first
+        await window.authClient.requireAuth();
+        
+        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}`);
+        
+        if (!response.ok) {
+          throw new Error('Nie udało się załadować decka');
+        }
+        
+        const deck = await response.json();
+        this.renderDeckInfo(deck);
+        
+      } catch (error) {
+        console.error('Error loading deck:', error);
+        if (error.message === 'Unauthorized') {
+          return; // Already redirected to login
+        }
+        this.showError('Błąd podczas ładowania decka');
+      }
+    }
+    
+    async loadCards() {
+      try {
+        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards`);
+        
+        if (!response.ok) {
+          throw new Error('Nie udało się załadować fiszek');
+        }
+        
+        const data = await response.json();
+        this.currentCards = data.items;
+        this.renderCards(this.currentCards);
+        
+      } catch (error) {
+        console.error('Error loading cards:', error);
+        if (error.message === 'Unauthorized') {
+          return; // Already redirected to login
+        }
+        this.showError('Błąd podczas ładowania fiszek');
+      }
+    }
+    
+    renderDeckInfo(deck) {
+      document.getElementById('deck-title').textContent = deck.name;
+      document.getElementById('deck-meta').innerHTML = `
+        <span class="deck-language">${this.getLanguageName(deck.language_code)}</span>
+        <span class="deck-date">Utworzony ${this.formatDate(deck.created_at)}</span>
+      `;
+    }
+    
+    renderCards(cards) {
+      const grid = document.getElementById('cards-grid');
+      
+      if (cards.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>Brak fiszek</h3>
+            <p>Ten deck nie zawiera jeszcze żadnych fiszek. Utwórz pierwszą!</p>
+            <button class="btn btn-primary" onclick="document.getElementById('new-card-btn').click()">
+              Utwórz pierwszą fiszkę
+            </button>
+          </div>
+        `;
+        return;
+      }
+      
+      const html = cards.map(card => `
+        <div class="card-item" data-card-id="${card.id}">
+          <div class="card-header">
+            <div class="card-source ${card.source}">${card.source === 'ai' ? 'AI' : 'Ręczna'}</div>
+            <div class="card-actions">
+              <button class="action-btn" onclick="window.deckManager.editCard('${card.id}')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <button class="action-btn danger" onclick="window.deckManager.deleteCard('${card.id}')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="card-content">
+            <div class="card-front">
+              <div class="card-label">Przód:</div>
+              <div class="card-text">${this.escapeHtml(card.front)}</div>
+            </div>
+            
+            <div class="card-back">
+              <div class="card-label">Tył:</div>
+              <div class="card-text">${this.escapeHtml(card.back)}</div>
+            </div>
+          </div>
+          
+          <div class="card-meta">
+            <span class="card-date">Utworzona ${this.formatDate(card.created_at)}</span>
+            ${card.due_at ? `<span class="card-due">Kolejna ${this.formatDate(card.due_at)}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+      
+      grid.innerHTML = html;
+    }
+    
+    showNewCardModal() {
+      document.getElementById('new-card-modal')?.classList.remove('hidden');
+      document.getElementById('card-front')?.focus();
+    }
+    
+    hideNewCardModal() {
+      document.getElementById('new-card-modal')?.classList.add('hidden');
+      this.resetForm('new-card-form');
+    }
+    
+    showEditCardModal() {
+      document.getElementById('edit-card-modal')?.classList.remove('hidden');
+      document.getElementById('edit-card-front')?.focus();
+    }
+    
+    hideEditCardModal() {
+      document.getElementById('edit-card-modal')?.classList.add('hidden');
+      this.resetForm('edit-card-form');
+    }
+    
+    async handleCreateCard(e) {
+      e.preventDefault();
+      
+      const form = e.target;
+      const formData = new FormData(form);
+      
+      const createBtn = document.getElementById('create-card-btn');
+      const btnText = createBtn.querySelector('.btn-text');
+      const btnSpinner = createBtn.querySelector('.btn-spinner');
+      const formMessage = document.getElementById('form-message');
+      
+      this.showLoadingState(createBtn, btnText, btnSpinner);
+      formMessage.textContent = '';
+      formMessage.className = 'form-message';
+      
+      try {
+        const cardData = {
+          front: formData.get('front'),
+          back: formData.get('back'),
+          language_code: formData.get('language_code') || undefined
+        };
+        
+        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards`, {
+          method: 'POST',
+          body: JSON.stringify(cardData)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Nie udało się utworzyć fiszki');
+        }
+        
+        formMessage.textContent = 'Fiszka została utworzona pomyślnie!';
+        formMessage.className = 'form-message success';
+        
+        setTimeout(async () => {
+          this.hideNewCardModal();
+          await this.loadCards();
+        }, 1500);
+        
+      } catch (error) {
+        formMessage.textContent = error.message;
+        formMessage.className = 'form-message error';
+      } finally {
+        this.hideLoadingState(createBtn, btnText, btnSpinner);
+      }
+    }
+    
+    async handleUpdateCard(e) {
+      e.preventDefault();
+      
+      const form = e.target;
+      const formData = new FormData(form);
+      const cardId = formData.get('cardId');
+      
+      const updateBtn = document.getElementById('update-card-btn');
+      const btnText = updateBtn.querySelector('.btn-text');
+      const btnSpinner = updateBtn.querySelector('.btn-spinner');
+      const formMessage = document.getElementById('edit-form-message');
+      
+      this.showLoadingState(updateBtn, btnText, btnSpinner);
+      formMessage.textContent = '';
+      formMessage.className = 'form-message';
+      
+      try {
+        const cardData = {
+          front: formData.get('front'),
+          back: formData.get('back'),
+          language_code: formData.get('language_code') || undefined
+        };
+        
+        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards/${cardId}`, {
+          method: 'PUT',
+          body: JSON.stringify(cardData)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Nie udało się zaktualizować fiszki');
+        }
+        
+        formMessage.textContent = 'Fiszka została zaktualizowana pomyślnie!';
+        formMessage.className = 'form-message success';
+        
+        setTimeout(async () => {
+          this.hideEditCardModal();
+          await this.loadCards();
+        }, 1500);
+        
+      } catch (error) {
+        formMessage.textContent = error.message;
+        formMessage.className = 'form-message error';
+      } finally {
+        this.hideLoadingState(updateBtn, btnText, btnSpinner);
+      }
+    }
+    
+    editCard(cardId) {
+      const card = this.currentCards.find(c => c.id === cardId);
+      if (!card) return;
+      
+      document.getElementById('edit-card-id').value = cardId;
+      document.getElementById('edit-card-front').value = card.front;
+      document.getElementById('edit-card-back').value = card.back;
+      document.getElementById('edit-language-code').value = card.language_code || '';
+      
+      // Update character counters
+      document.getElementById('edit-front-char-count').textContent = card.front.length;
+      document.getElementById('edit-back-char-count').textContent = card.back.length;
+      
+      this.showEditCardModal();
+    }
+    
+    async deleteCard(cardId) {
+      if (!confirm('Czy na pewno chcesz usunąć tę fiszkę? Ta operacja jest nieodwracalna.')) {
+        return;
+      }
+      
+      try {
+        const response = await window.authClient.authenticatedFetch(`/api/decks/${this.deckId}/cards/${cardId}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Nie udało się usunąć fiszki');
+        }
+        
+        await this.loadCards();
+        
+      } catch (error) {
+        alert(`Błąd: ${error.message}`);
+      }
+    }
+    
+    filterCards() {
+      // Implementation for filtering cards based on search and filters
+      console.log('Filtering cards...');
+    }
+    
+    showLoadingState(btn, btnText, btnSpinner) {
+      btn.disabled = true;
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+    }
+    
+    hideLoadingState(btn, btnText, btnSpinner) {
+      btn.disabled = false;
+      btnText.classList.remove('hidden');
+      btnSpinner.classList.add('hidden');
+    }
+    
+    resetForm(formId) {
+      const form = document.getElementById(formId);
+      form.reset();
+      
+      // Reset character counters
+      const counters = form.querySelectorAll('.char-counter span');
+      counters.forEach(counter => counter.textContent = '0');
+      
+      // Reset form message
+      const formMessage = form.querySelector('.form-message');
+      if (formMessage) {
+        formMessage.textContent = '';
+        formMessage.className = 'form-message';
+      }
+    }
+    
+    getLanguageName(code) {
+      const languages = {
+        pl: 'Polski',
+        en: 'Angielski',
+        de: 'Niemiecki',
+        fr: 'Francuski',
+        es: 'Hiszpański'
+      };
+      return languages[code] || 'Nie określono';
+    }
+    
+    formatDate(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return 'wczoraj';
+      if (diffDays < 7) return `${diffDays} dni temu`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} tygodni temu`;
+      
+      return date.toLocaleDateString('pl-PL');
+    }
+    
+    escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    showError(message) {
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = `
+        <div class="error-state">
+          <p>${message}</p>
+          <button class="btn btn-primary" onclick="window.location.reload()">Spróbuj ponownie</button>
+        </div>
+      `;
+    }
+  }
+  
+  // Initialize and make available globally
+  document.addEventListener('DOMContentLoaded', () => {
+    window.deckManager = new DeckDetailManager(deckId);
+  });
+</script>
+
+<style>
+  .deck-detail-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    gap: 1rem;
+  }
+  
+  .header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .back-btn {
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+  }
+  
+  .deck-info {
+    flex: 1;
+  }
+  
+  .deck-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .deck-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+  }
+  
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: #4b5563;
+  }
+  
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .btn-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .deck-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .cards-filters {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .search-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .filter-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    min-width: 150px;
+  }
+  
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .card-item {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+  }
+  
+  .card-item:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .card-source {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  
+  .card-source.manual {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  
+  .card-source.ai {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .card-actions {
+    display: flex;
+    gap: 0.25rem;
+  }
+  
+  .action-btn {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: #6b7280;
+    border-radius: 0.25rem;
+    transition: all 0.2s ease;
+  }
+  
+  .action-btn:hover {
+    background: #f3f4f6;
+  }
+  
+  .action-btn.danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+  
+  .action-btn svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .card-content {
+    margin-bottom: 1rem;
+  }
+  
+  .card-front,
+  .card-back {
+    margin-bottom: 0.75rem;
+  }
+  
+  .card-front:last-child,
+  .card-back:last-child {
+    margin-bottom: 0;
+  }
+  
+  .card-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+  }
+  
+  .card-text {
+    color: #1f2937;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #6b7280;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 0.75rem;
+  }
+  
+  .loading-state,
+  .empty-state,
+  .error-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+  
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .empty-state p {
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    animation: spin 1s linear infinite;
+  }
+  
+  /* Modal styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 0 1.5rem;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+  }
+  
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0.25rem;
+    line-height: 1;
+  }
+  
+  .modal-form {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-group label {
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+    font-family: inherit;
+    resize: vertical;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .char-counter {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-align: right;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+  
+  .form-message {
+    text-align: center;
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    min-height: 1.25rem;
+  }
+  
+  .form-message.success {
+    background: #ecfdf5;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+  }
+  
+  .form-message.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @media (max-width: 768px) {
+    .deck-detail-page {
+      padding: 1rem;
+    }
+    
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .header-left {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .filters-row {
+      flex-direction: column;
+    }
+    
+    .cards-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .modal-actions {
+      flex-direction: column;
+    }
+    
+    .card-meta {
+      flex-direction: column;
+      gap: 0.25rem;
+      align-items: flex-start;
+    }
+  }
+</style>

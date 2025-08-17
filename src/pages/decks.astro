@@ -135,50 +135,29 @@ import AppLayout from '../layouts/AppLayout.astro';
     
     private async loadDecks() {
       try {
-        const token = localStorage.getItem('supabase_token');
-        if (!token) return;
+        // Check if auth helpers are available
+        if (!window.authClient) {
+          const authModule = await import('/src/lib/auth/auth-client.ts');
+          window.authClient = authModule;
+        }
         
-        // Mock data for demo
-        const mockDecks = [
-          {
-            id: 'deck-1',
-            name: 'Fizyka kwantowa',
-            slug: 'fizyka-kwantowa',
-            language_code: 'pl',
-            is_archived: false,
-            cards_count: 25,
-            due_cards: 5,
-            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: 'deck-2',
-            name: 'Historia Polski',
-            slug: 'historia-polski',
-            language_code: 'pl',
-            is_archived: false,
-            cards_count: 42,
-            due_cards: 12,
-            created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: 'deck-3',
-            name: 'Programowanie JavaScript',
-            slug: 'programowanie-js',
-            language_code: 'pl',
-            is_archived: false,
-            cards_count: 38,
-            due_cards: 8,
-            created_at: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ];
+        // Check authentication first
+        await window.authClient.requireAuth();
         
-        this.renderDecks(mockDecks);
+        const response = await window.authClient.authenticatedFetch('/api/decks');
+        
+        if (!response.ok) {
+          throw new Error('Nie udało się załadować decki');
+        }
+        
+        const data = await response.json();
+        this.renderDecks(data.items || []);
         
       } catch (error) {
         console.error('Error loading decks:', error);
+        if (error.message === 'Unauthorized') {
+          return; // Already redirected to login
+        }
         this.showError('Błąd podczas ładowania decki');
       }
     }
@@ -271,20 +250,21 @@ import AppLayout from '../layouts/AppLayout.astro';
       formMessage.className = 'form-message';
       
       try {
-        const token = localStorage.getItem('supabase_token');
-        if (!token) throw new Error('Brak autoryzacji');
-        
         const deckData = {
           name: formData.get('name'),
           slug: formData.get('slug') || this.generateSlug(formData.get('name') as string),
           language_code: formData.get('language_code') || null
         };
         
-        // In real app, call the API
-        // const response = await fetch('/api/decks', { ... });
+        const response = await window.authClient.authenticatedFetch('/api/decks', {
+          method: 'POST',
+          body: JSON.stringify(deckData)
+        });
         
-        // Mock success
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Nie udało się utworzyć decka');
+        }
         
         formMessage.textContent = 'Deck został utworzony pomyślnie!';
         formMessage.className = 'form-message success';
