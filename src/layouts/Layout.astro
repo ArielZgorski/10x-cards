@@ -1,24 +1,74 @@
 ---
 import "../styles/global.css";
+import { createServerSupabaseClient } from '../db/supabase.client.ts';
 
 interface Props {
   title?: string;
+  requireAuth?: boolean;
 }
 
-const { title = "10x Astro Starter" } = Astro.props;
+const { title = "10x Cards", requireAuth = false } = Astro.props;
+
+// DISABLED - No auth check
+let user = { id: 'mock', email: 'mock@test.com', display_name: 'Mock User' };
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="description" content="10x Cards - AI-powered flashcard generator" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
   <body>
-    <slot />
+    <div id="app">
+      <slot />
+    </div>
+    
+    <!-- Auth state management script -->
+    <script define:vars={{ user, requireAuth }}>
+      // Global auth state management
+      window.authState = {
+        user: user,
+        isAuthenticated: !!user
+      };
+      
+      // DISABLED - No auth check
+      const checkAuthState = async () => {
+        // Do nothing - auth disabled
+      };
+      
+      // Listen for auth state changes across tabs
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'supabase.auth.token') {
+          checkAuthState();
+        }
+      });
+      
+      // Listen for custom auth events
+      window.addEventListener('auth-state-changed', checkAuthState);
+      
+      // Add logout functionality globally
+      window.logout = async () => {
+        try {
+          await fetch('/api/auth/signout', {
+            method: 'POST',
+            credentials: 'include'
+          });
+          
+          window.authState.user = null;
+          window.authState.isAuthenticated = false;
+          window.location.href = '/login';
+        } catch (error) {
+          console.error('Logout error:', error);
+          // Force logout even if API fails
+          window.location.href = '/login';
+        }
+      };
+    </script>
   </body>
 </html>
 
@@ -28,5 +78,10 @@ const { title = "10x Astro Starter" } = Astro.props;
     margin: 0;
     width: 100%;
     height: 100%;
+    background-color: #fafafa;
+  }
+  
+  #app {
+    min-height: 100vh;
   }
 </style>

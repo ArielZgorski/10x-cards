@@ -1,0 +1,202 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { AuthProvider } from '../components/auth/AuthProvider';
+import { RegisterForm } from '../components/forms/RegisterForm';
+---
+
+<Layout title="Rejestracja - 10x Cards">
+  <div class="register-page">
+    <div class="register-container">
+      <div class="register-card">
+        <div class="register-header">
+          <h1>10x Cards</h1>
+          <p>Utwórz nowe konto</p>
+        </div>
+        
+        <AuthProvider client:only="react">
+          <RegisterForm />
+        </AuthProvider>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<!-- Import form styles -->
+<link rel="stylesheet" href="/src/components/forms/form-styles.css">
+
+<script>
+  // Check if already logged in and redirect
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user && data.session) {
+          window.location.href = '/ai/generations';
+        }
+      }
+    } catch (error) {
+      // Ignore errors, user is not logged in
+      console.debug('Not logged in');
+    }
+  });
+</script>
+
+<style>
+  .register-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  
+  .register-container {
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .register-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .register-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  
+  .register-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .register-header p {
+    color: #6b7280;
+    margin: 0;
+  }
+  
+  .register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-group label {
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .form-group input {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .form-group input:invalid {
+    border-color: #dc2626;
+  }
+  
+  .form-hint {
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+  
+  .register-button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .register-button:hover:not(:disabled) {
+    background: #2563eb;
+  }
+  
+  .register-button:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+  
+  .spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    animation: spin 1s linear infinite;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  .error-message {
+    color: #dc2626;
+    font-size: 0.875rem;
+    text-align: center;
+    min-height: 1.25rem;
+  }
+  
+  .success-message {
+    color: #16a34a;
+    font-size: 0.875rem;
+    text-align: center;
+    min-height: 1.25rem;
+  }
+  
+  .register-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .register-footer a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .register-footer a:hover {
+    text-decoration: underline;
+  }
+  
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+

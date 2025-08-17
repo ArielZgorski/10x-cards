@@ -12,6 +12,9 @@ import type { APIRoute } from 'astro';
 import type { CreateAIGenerationCommand, UUID } from '../../../../types';
 import { ensureRateLimit } from '../../../../lib/rate-limit';
 import { enqueueGeneration } from '../../../../lib/ai/generation.service';
+import { requireAuth, createErrorResponse } from '../../../../lib/auth/auth-helpers';
+
+export const prerender = false;
 
 // Response type for this endpoint
 interface CreateAIGenerationAcceptedDTO {
@@ -45,45 +48,20 @@ const CreateAIGenerationSchema = z.object({
 /**
  * POST handler for AI generation requests
  */
-export const POST: APIRoute = async ({ request, locals }) => {
-  const requestId = crypto.randomUUID();
-  const startTime = Date.now();
+export const POST: APIRoute = async (context) => {
+  return requireAuth(context, async (user, { request, locals }) => {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
 
-  try {
-    // 1. Authentication - verify Authorization header and get Supabase client
-    const supabase = locals.supabase;
-    if (!supabase) {
-      console.error('Supabase client not available in locals', { requestId });
-      return createErrorResponse(500, 'Internal server error');
-    }
+    try {
+      const userId = user.id;
+      const supabase = locals.supabase;
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.warn('Missing or invalid Authorization header', { 
+      console.log('AI generation request initiated', { 
         requestId, 
-        hasAuth: !!authHeader,
-        authStart: authHeader?.substring(0, 10) 
+        userId, 
+        userAgent: request.headers.get('user-agent')?.substring(0, 100) 
       });
-      return createErrorResponse(401, 'Authorization header required');
-    }
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.warn('Authentication failed', { 
-        requestId, 
-        error: authError?.message,
-        hasUser: !!user 
-      });
-      return createErrorResponse(401, 'Invalid or expired token');
-    }
-
-    const userId = user.id;
-    console.log('AI generation request initiated', { 
-      requestId, 
-      userId, 
-      userAgent: request.headers.get('user-agent')?.substring(0, 100) 
-    });
 
     // 2. Parse and validate request body
     let requestBody: unknown;
@@ -220,39 +198,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
       },
     });
 
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error('Unhandled error in AI generation endpoint', { 
-      requestId, 
-      duration,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined 
-    });
-    
-    return createErrorResponse(500, 'Internal server error');
-  }
-};
-
-/**
- * Helper function to create standardized error responses
- */
-function createErrorResponse(
-  status: number, 
-  message: string, 
-  additionalHeaders: Record<string, string> = {}
-): Response {
-  return new Response(
-    JSON.stringify({ 
-      error: message,
-      status,
-      timestamp: new Date().toISOString(),
-    }), 
-    {
-      status,
-      headers: {
-        'Content-Type': 'application/json',
-        ...additionalHeaders,
-      },
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error('Unhandled error in AI generation endpoint', { 
+        requestId, 
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined 
+      });
+      
+      return createErrorResponse(500, 'Internal server error');
     }
-  );
-}
+  });
+};

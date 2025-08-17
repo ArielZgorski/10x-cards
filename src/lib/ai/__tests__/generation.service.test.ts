@@ -12,6 +12,12 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(),
 }));
 
+// Mock OpenRouterService
+vi.mock('../openrouter.service', () => ({
+  createOpenRouterService: vi.fn(),
+  OpenRouterService: vi.fn(),
+}));
+
 // Import the service after mocking
 import { enqueueGeneration } from '../generation.service';
 
@@ -79,17 +85,15 @@ export const testUtils = {
     ...overrides,
   }),
 
-  createMockOpenRouterResponse: (overrides = {}) => ({
-    choices: [
-      {
-        message: {
-          content: JSON.stringify([
-            { front: 'Test question 1?', back: 'Test answer 1' },
-            { front: 'Test question 2?', back: 'Test answer 2' },
-          ]),
-        },
-      },
+  createMockOpenRouterServiceResponse: (overrides = {}) => ({
+    json: [
+      { front: 'Test question 1?', back: 'Test answer 1' },
+      { front: 'Test question 2?', back: 'Test answer 2' },
     ],
+    raw: JSON.stringify([
+      { front: 'Test question 1?', back: 'Test answer 1' },
+      { front: 'Test question 2?', back: 'Test answer 2' },
+    ]),
     usage: {
       prompt_tokens: 100,
       completion_tokens: 50,

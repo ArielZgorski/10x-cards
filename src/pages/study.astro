@@ -1,0 +1,821 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Sesja nauki - 10x Cards" currentPage="study">
+  <div class="study-page">
+    <!-- Study Controls -->
+    <div class="study-controls" id="study-controls">
+      <div class="study-header">
+        <h1 class="study-title">Sesja nauki</h1>
+        <div class="study-filters">
+          <select id="deck-filter" class="deck-select">
+            <option value="">Wszystkie decki</option>
+            <!-- Populated by JS -->
+          </select>
+          <button id="start-study-btn" class="start-btn">Rozpocznij naukę</button>
+        </div>
+      </div>
+      
+      <div class="study-stats" id="study-stats">
+        <div class="stat-card">
+          <div class="stat-number" id="new-cards">0</div>
+          <div class="stat-label">Nowe</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="due-cards">0</div>
+          <div class="stat-label">Do powtórki</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="learning-cards">0</div>
+          <div class="stat-label">W trakcie nauki</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Study Session -->
+    <div class="study-session hidden" id="study-session">
+      <div class="session-header">
+        <div class="session-progress">
+          <div class="progress-text">
+            <span id="cards-reviewed">0</span> / <span id="total-cards">0</span> kart
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+        <button id="end-session-btn" class="end-session-btn">Zakończ sesję</button>
+      </div>
+      
+      <div class="study-card-container">
+        <div class="study-card" id="study-card">
+          <div class="card-content">
+            <div class="card-side front" id="card-front">
+              <div class="card-text"></div>
+              <button id="show-answer-btn" class="show-answer-btn">Pokaż odpowiedź</button>
+            </div>
+            
+            <div class="card-side back hidden" id="card-back">
+              <div class="card-text"></div>
+              <div class="rating-buttons">
+                <button class="rating-btn fail" data-rating="0">
+                  <span class="rating-number">1</span>
+                  <span class="rating-text">Niepoprawnie</span>
+                </button>
+                <button class="rating-btn hard" data-rating="1">
+                  <span class="rating-number">2</span>
+                  <span class="rating-text">Trudno</span>
+                </button>
+                <button class="rating-btn good" data-rating="2">
+                  <span class="rating-number">3</span>
+                  <span class="rating-text">Dobrze</span>
+                </button>
+                <button class="rating-btn easy" data-rating="3">
+                  <span class="rating-number">4</span>
+                  <span class="rating-text">Łatwo</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Session Complete -->
+    <div class="session-complete hidden" id="session-complete">
+      <div class="complete-content">
+        <div class="complete-icon">🎉</div>
+        <h2>Gratulacje!</h2>
+        <p>Ukończono sesję nauki</p>
+        <div class="session-summary" id="session-summary">
+          <!-- Populated by JS -->
+        </div>
+        <div class="complete-actions">
+          <button id="new-session-btn" class="btn btn-primary">Nowa sesja</button>
+          <a href="/ai/generations" class="btn btn-secondary">Generuj więcej fiszek</a>
+        </div>
+      </div>
+    </div>
+    
+    <!-- No Cards State -->
+    <div class="no-cards-state hidden" id="no-cards-state">
+      <div class="empty-content">
+        <div class="empty-icon">📚</div>
+        <h2>Brak kart do nauki</h2>
+        <p>Nie masz jeszcze żadnych kart gotowych do nauki</p>
+        <div class="empty-actions">
+          <a href="/ai/generations" class="btn btn-primary">Generuj fiszki AI</a>
+          <a href="/decks" class="btn btn-secondary">Dodaj ręcznie</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<script>
+  class StudySession {
+    private studyQueue: any[] = [];
+    private currentCardIndex = 0;
+    private sessionStats = { reviewed: 0, correct: 0, failed: 0 };
+    private startTime = Date.now();
+    
+    constructor() {
+      this.init();
+    }
+    
+    private async init() {
+      await this.loadDecks();
+      await this.loadStudyStats();
+      this.setupEventListeners();
+      this.setupKeyboardShortcuts();
+    }
+    
+    private async loadDecks() {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        // Mock data for demo
+        const mockDecks = [
+          { id: 'deck-1', name: 'Fizyka kwantowa' },
+          { id: 'deck-2', name: 'Historia Polski' },
+          { id: 'deck-3', name: 'Programowanie' }
+        ];
+        
+        const select = document.getElementById('deck-filter') as HTMLSelectElement;
+        mockDecks.forEach(deck => {
+          const option = document.createElement('option');
+          option.value = deck.id;
+          option.textContent = deck.name;
+          select.appendChild(option);
+        });
+        
+      } catch (error) {
+        console.error('Error loading decks:', error);
+      }
+    }
+    
+    private async loadStudyStats() {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        // Mock stats for demo
+        const stats = {
+          new: 5,
+          due: 12,
+          learning: 8
+        };
+        
+        document.getElementById('new-cards')!.textContent = stats.new.toString();
+        document.getElementById('due-cards')!.textContent = stats.due.toString();
+        document.getElementById('learning-cards')!.textContent = stats.learning.toString();
+        
+      } catch (error) {
+        console.error('Error loading study stats:', error);
+      }
+    }
+    
+    private setupEventListeners() {
+      document.getElementById('start-study-btn')?.addEventListener('click', () => this.startStudySession());
+      document.getElementById('show-answer-btn')?.addEventListener('click', () => this.showAnswer());
+      document.getElementById('end-session-btn')?.addEventListener('click', () => this.endSession());
+      document.getElementById('new-session-btn')?.addEventListener('click', () => this.resetSession());
+      
+      // Rating buttons
+      document.querySelectorAll('.rating-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const rating = parseInt((e.currentTarget as HTMLElement).dataset.rating!);
+          this.rateCard(rating);
+        });
+      });
+    }
+    
+    private setupKeyboardShortcuts() {
+      document.addEventListener('keydown', (e) => {
+        if (!this.isStudySessionActive()) return;
+        
+        switch (e.key) {
+          case ' ':
+          case 'Enter':
+            e.preventDefault();
+            if (this.isShowingFront()) {
+              this.showAnswer();
+            }
+            break;
+          case '1':
+            e.preventDefault();
+            if (this.isShowingBack()) this.rateCard(0);
+            break;
+          case '2':
+            e.preventDefault();
+            if (this.isShowingBack()) this.rateCard(1);
+            break;
+          case '3':
+            e.preventDefault();
+            if (this.isShowingBack()) this.rateCard(2);
+            break;
+          case '4':
+            e.preventDefault();
+            if (this.isShowingBack()) this.rateCard(3);
+            break;
+        }
+      });
+    }
+    
+    private async startStudySession() {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        const deckId = (document.getElementById('deck-filter') as HTMLSelectElement).value;
+        
+        // Mock study queue for demo
+        this.studyQueue = [
+          {
+            id: 'card-1',
+            front: 'Co to jest zasada nieoznaczoności Heisenberga?',
+            back: 'Zasada nieoznaczoności Heisenberga mówi, że nie można jednocześnie dokładnie określić położenia i pędu cząstki kwantowej. Im dokładniej znamy położenie, tym mniej dokładnie możemy określić pęd i odwrotnie.',
+            deck_id: 'deck-1'
+          },
+          {
+            id: 'card-2',
+            front: 'Kiedy miała miejsce bitwa pod Grunwaldem?',
+            back: 'Bitwa pod Grunwaldem miała miejsce 15 lipca 1410 roku. Była to jedna z największych bitew średniowiecznej Europy, w której wojska polsko-litewskie pokonały zakon krzyżacki.',
+            deck_id: 'deck-2'
+          },
+          {
+            id: 'card-3',
+            front: 'Co to jest rekurencja w programowaniu?',
+            back: 'Rekurencja to technika programowania, w której funkcja wywołuje samą siebie. Składa się z przypadku bazowego (warunek zatrzymania) i przypadku rekurencyjnego (wywołanie funkcji z mniejszym problemem).',
+            deck_id: 'deck-3'
+          }
+        ];
+        
+        if (this.studyQueue.length === 0) {
+          this.showNoCardsState();
+          return;
+        }
+        
+        this.currentCardIndex = 0;
+        this.sessionStats = { reviewed: 0, correct: 0, failed: 0 };
+        this.startTime = Date.now();
+        
+        this.showStudySession();
+        this.displayCurrentCard();
+        
+      } catch (error) {
+        console.error('Error starting study session:', error);
+      }
+    }
+    
+    private showStudySession() {
+      document.getElementById('study-controls')?.classList.add('hidden');
+      document.getElementById('study-session')?.classList.remove('hidden');
+      
+      const totalCards = document.getElementById('total-cards')!;
+      totalCards.textContent = this.studyQueue.length.toString();
+    }
+    
+    private displayCurrentCard() {
+      if (this.currentCardIndex >= this.studyQueue.length) {
+        this.completeSession();
+        return;
+      }
+      
+      const card = this.studyQueue[this.currentCardIndex];
+      
+      // Update front side
+      const frontText = document.querySelector('#card-front .card-text') as HTMLElement;
+      frontText.textContent = card.front;
+      
+      // Update back side
+      const backText = document.querySelector('#card-back .card-text') as HTMLElement;
+      backText.textContent = card.back;
+      
+      // Show front, hide back
+      document.getElementById('card-front')?.classList.remove('hidden');
+      document.getElementById('card-back')?.classList.add('hidden');
+      
+      // Update progress
+      this.updateProgress();
+    }
+    
+    private showAnswer() {
+      document.getElementById('card-front')?.classList.add('hidden');
+      document.getElementById('card-back')?.classList.remove('hidden');
+    }
+    
+    private async rateCard(rating: number) {
+      try {
+        const card = this.studyQueue[this.currentCardIndex];
+        const reviewDuration = 5000; // Mock duration
+        
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        // In real app, call the API
+        // await fetch(`/api/cards/${card.id}/reviews`, { ... });
+        
+        // Update session stats
+        this.sessionStats.reviewed++;
+        if (rating >= 2) {
+          this.sessionStats.correct++;
+        } else {
+          this.sessionStats.failed++;
+        }
+        
+        // Move to next card
+        this.currentCardIndex++;
+        
+        setTimeout(() => {
+          this.displayCurrentCard();
+        }, 500);
+        
+      } catch (error) {
+        console.error('Error rating card:', error);
+      }
+    }
+    
+    private updateProgress() {
+      const cardsReviewed = document.getElementById('cards-reviewed')!;
+      const progressFill = document.getElementById('progress-fill') as HTMLElement;
+      
+      cardsReviewed.textContent = this.sessionStats.reviewed.toString();
+      
+      const progress = (this.sessionStats.reviewed / this.studyQueue.length) * 100;
+      progressFill.style.width = `${progress}%`;
+    }
+    
+    private completeSession() {
+      const sessionTime = Math.round((Date.now() - this.startTime) / 1000);
+      
+      document.getElementById('study-session')?.classList.add('hidden');
+      document.getElementById('session-complete')?.classList.remove('hidden');
+      
+      // Show session summary
+      const summary = document.getElementById('session-summary')!;
+      summary.innerHTML = `
+        <div class="summary-stats">
+          <div class="summary-stat">
+            <span class="summary-number">${this.sessionStats.reviewed}</span>
+            <span class="summary-label">Przejrzane karty</span>
+          </div>
+          <div class="summary-stat">
+            <span class="summary-number">${this.sessionStats.correct}</span>
+            <span class="summary-label">Poprawne</span>
+          </div>
+          <div class="summary-stat">
+            <span class="summary-number">${this.sessionStats.failed}</span>
+            <span class="summary-label">Niepoprawne</span>
+          </div>
+          <div class="summary-stat">
+            <span class="summary-number">${Math.floor(sessionTime / 60)}:${String(sessionTime % 60).padStart(2, '0')}</span>
+            <span class="summary-label">Czas sesji</span>
+          </div>
+        </div>
+      `;
+    }
+    
+    private endSession() {
+      if (confirm('Czy na pewno chcesz zakończyć sesję nauki?')) {
+        this.completeSession();
+      }
+    }
+    
+    private resetSession() {
+      document.getElementById('session-complete')?.classList.add('hidden');
+      document.getElementById('study-controls')?.classList.remove('hidden');
+      
+      this.loadStudyStats();
+    }
+    
+    private showNoCardsState() {
+      document.getElementById('study-controls')?.classList.add('hidden');
+      document.getElementById('no-cards-state')?.classList.remove('hidden');
+    }
+    
+    private isStudySessionActive(): boolean {
+      return !document.getElementById('study-session')?.classList.contains('hidden');
+    }
+    
+    private isShowingFront(): boolean {
+      return !document.getElementById('card-front')?.classList.contains('hidden');
+    }
+    
+    private isShowingBack(): boolean {
+      return !document.getElementById('card-back')?.classList.contains('hidden');
+    }
+  }
+  
+  // Initialize study session when page loads
+  document.addEventListener('DOMContentLoaded', () => {
+    new StudySession();
+  });
+</script>
+
+<style>
+  .study-page {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    min-height: calc(100vh - 4rem);
+  }
+  
+  .study-controls {
+    text-align: center;
+  }
+  
+  .study-header {
+    margin-bottom: 2rem;
+  }
+  
+  .study-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+  }
+  
+  .study-filters {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .deck-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    min-width: 200px;
+  }
+  
+  .start-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .start-btn:hover {
+    background: #2563eb;
+  }
+  
+  .study-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  .stat-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    text-align: center;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #3b82f6;
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+  
+  .study-session {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+  }
+  
+  .session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .session-progress {
+    flex: 1;
+    margin-right: 2rem;
+  }
+  
+  .progress-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+  }
+  
+  .progress-bar {
+    width: 100%;
+    height: 0.5rem;
+    background: #e5e7eb;
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: #3b82f6;
+    transition: width 0.3s ease;
+  }
+  
+  .end-session-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .end-session-btn:hover {
+    background: #4b5563;
+  }
+  
+  .study-card-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .study-card {
+    width: 100%;
+    max-width: 600px;
+    min-height: 400px;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+  
+  .card-content {
+    height: 100%;
+    position: relative;
+  }
+  
+  .card-side {
+    padding: 2rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .card-text {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: #1f2937;
+    margin-bottom: 2rem;
+  }
+  
+  .show-answer-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .show-answer-btn:hover {
+    background: #2563eb;
+  }
+  
+  .rating-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .rating-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    border: 2px solid;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+  }
+  
+  .rating-btn.fail {
+    border-color: #dc2626;
+    color: #dc2626;
+  }
+  
+  .rating-btn.fail:hover {
+    background: #fef2f2;
+  }
+  
+  .rating-btn.hard {
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+  
+  .rating-btn.hard:hover {
+    background: #fffbeb;
+  }
+  
+  .rating-btn.good {
+    border-color: #16a34a;
+    color: #16a34a;
+  }
+  
+  .rating-btn.good:hover {
+    background: #f0fdf4;
+  }
+  
+  .rating-btn.easy {
+    border-color: #3b82f6;
+    color: #3b82f6;
+  }
+  
+  .rating-btn.easy:hover {
+    background: #eff6ff;
+  }
+  
+  .rating-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  
+  .rating-text {
+    font-size: 0.875rem;
+  }
+  
+  .session-complete,
+  .no-cards-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 4rem);
+    text-align: center;
+  }
+  
+  .complete-content,
+  .empty-content {
+    max-width: 400px;
+  }
+  
+  .complete-icon,
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .complete-content h2,
+  .empty-content h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .complete-content p,
+  .empty-content p {
+    color: #6b7280;
+    margin: 0 0 2rem 0;
+  }
+  
+  .session-summary {
+    margin-bottom: 2rem;
+  }
+  
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  .summary-stat {
+    text-align: center;
+  }
+  
+  .summary-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #3b82f6;
+  }
+  
+  .summary-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .complete-actions,
+  .empty-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #2563eb;
+  }
+  
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+  
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .study-page {
+      padding: 1rem;
+    }
+    
+    .study-filters {
+      flex-direction: column;
+    }
+    
+    .deck-select {
+      min-width: auto;
+      width: 100%;
+      max-width: 300px;
+    }
+    
+    .session-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .session-progress {
+      margin-right: 0;
+      width: 100%;
+    }
+    
+    .rating-buttons {
+      grid-template-columns: 1fr;
+    }
+    
+    .summary-stats {
+      grid-template-columns: 1fr;
+    }
+    
+    .complete-actions,
+    .empty-actions {
+      flex-direction: column;
+    }
+    
+    .btn {
+      width: 100%;
+    }
+  }
+</style>
+

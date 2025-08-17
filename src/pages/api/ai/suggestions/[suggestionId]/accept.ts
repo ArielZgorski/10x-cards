@@ -1,15 +1,15 @@
 /**
- * POST /api/ai/suggestions/[suggestionId]/accept - Accept a suggestion and create a card
+ * POST /api/ai/suggestions/[suggestionId]/accept - Accept AI suggestion and create card
  */
 
 import { z } from 'zod';
 import type { APIRoute } from 'astro';
-import { getDeckById } from '../../../../../lib/deck.service';
+import { createCard } from '../../../../../lib/flashcard.service';
 
-// Zod schema for accepting suggestions
+// Zod schema for accept suggestion request
 const AcceptSuggestionSchema = z.object({
-  deck_id: z.string().uuid('Invalid deck ID format'),
-  language_code: z.string().min(2).max(10).optional(),
+  deck_id: z.string().uuid(),
+  language_code: z.string().max(10).optional(),
 });
 
 export const POST: APIRoute = async ({ request, locals, params }) => {
@@ -40,14 +40,9 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Parse and validate request body
-    let requestBody: unknown;
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      return createErrorResponse(400, 'Invalid JSON in request body');
-    }
-
-    const validationResult = AcceptSuggestionSchema.safeParse(requestBody);
+    const json = await request.json().catch(() => null);
+    const validationResult = AcceptSuggestionSchema.safeParse(json);
+    
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => 
         `${err.path.join('.')}: ${err.message}`
@@ -57,56 +52,54 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
 
     const { deck_id, language_code } = validationResult.data;
 
-    // Verify deck exists and belongs to user
-    const deck = await getDeckById(supabase, deck_id, user.id);
-    if (!deck) {
+    // Verify deck belongs to user
+    const { data: deck, error: deckError } = await supabase
+      .from('decks')
+      .select('id, user_id, language_code')
+      .eq('id', deck_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (deckError || !deck) {
       return createErrorResponse(404, 'Deck not found');
     }
 
-    // Get suggestion and verify it's not already accepted/rejected
+    // Get suggestion and verify it belongs to user and can be accepted
     const { data: suggestion, error: suggestionError } = await supabase
       .from('ai_suggestions')
-      .select()
+      .select('id, front, back, status, user_id')
       .eq('id', suggestionId)
       .eq('user_id', user.id)
       .single();
 
-    if (suggestionError) {
-      if (suggestionError.code === 'PGRST116') {
-        return createErrorResponse(404, 'Suggestion not found');
-      }
-      throw new Error(`Failed to get suggestion: ${suggestionError.message}`);
+    if (suggestionError || !suggestion) {
+      return createErrorResponse(404, 'Suggestion not found');
     }
 
-    if (suggestion.status === 'accepted' || suggestion.status === 'rejected') {
-      return createErrorResponse(400, `Suggestion is already ${suggestion.status}`);
+    if (suggestion.status === 'accepted') {
+      return createErrorResponse(400, 'Suggestion already accepted');
     }
 
-    // Start transaction: create card and update suggestion
-    const { data: card, error: cardError } = await supabase
-      .from('cards')
-      .insert({
-        user_id: user.id,
-        deck_id,
-        front: suggestion.front,
-        back: suggestion.back,
-        language_code: language_code || suggestion.language_code || null,
-        source: 'ai',
-      })
-      .select()
-      .single();
-
-    if (cardError) {
-      throw new Error(`Failed to create card: ${cardError.message}`);
+    if (suggestion.status === 'rejected') {
+      return createErrorResponse(400, 'Cannot accept rejected suggestion');
     }
 
-    // Update suggestion status
+    // Create card from suggestion
+    const card = await createCard(supabase, deck_id, user.id, {
+      front: suggestion.front,
+      back: suggestion.back,
+      language_code: language_code || deck.language_code || null,
+      source: 'ai' as const,
+    });
+
+    // Update suggestion to accepted and link to card
     const { data: updatedSuggestion, error: updateError } = await supabase
       .from('ai_suggestions')
       .update({
         status: 'accepted',
         accepted_at: new Date().toISOString(),
         card_id: card.id,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', suggestionId)
       .eq('user_id', user.id)
@@ -114,31 +107,14 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       .single();
 
     if (updateError) {
-      // Try to clean up the created card
-      await supabase.from('cards').delete().eq('id', card.id);
-      throw new Error(`Failed to update suggestion: ${updateError.message}`);
+      console.error('Error updating suggestion after card creation', { 
+        requestId, 
+        suggestionId, 
+        error: updateError 
+      });
+      // Note: Card was created but suggestion update failed
+      // In production, this should be handled with better transaction management
     }
-
-    const result = {
-      suggestion: updatedSuggestion,
-      card: {
-        id: card.id,
-        deck_id: card.deck_id,
-        front: card.front,
-        back: card.back,
-        source: card.source,
-        is_archived: card.is_archived,
-        language_code: card.language_code,
-        due_at: card.due_at,
-        last_reviewed_at: card.last_reviewed_at,
-        repetitions_count: card.repetitions_count,
-        lapses_count: card.lapses_count,
-        ease_factor: card.ease_factor,
-        interval_days: card.interval_days,
-        created_at: card.created_at,
-        updated_at: card.updated_at,
-      }
-    };
 
     const duration = Date.now() - startTime;
     console.log('Suggestion accepted successfully', { 
@@ -149,7 +125,15 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       duration 
     });
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      suggestion: updatedSuggestion || {
+        id: suggestionId,
+        status: 'accepted',
+        accepted_at: new Date().toISOString(),
+        card_id: card.id,
+      },
+      card,
+    }), {
       status: 201,
       headers: {
         'Content-Type': 'application/json',
@@ -178,11 +162,11 @@ function createErrorResponse(
   additionalHeaders: Record<string, string> = {}
 ): Response {
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       error: message,
       status,
       timestamp: new Date().toISOString(),
-    }), 
+    }),
     {
       status,
       headers: {

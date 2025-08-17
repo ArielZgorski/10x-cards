@@ -1,0 +1,19 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import GenerationDetailPage from '../../../components/GenerationDetailPage.tsx';
+
+export const prerender = false;
+
+// Guard: check for valid session - basic validation at route level
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/ai/generations');
+}
+
+// Set page metadata
+const title = `Generacja AI - Szczegóły`;
+---
+
+<Layout title={title}>
+  <GenerationDetailPage client:load generationId={id} />
+</Layout>

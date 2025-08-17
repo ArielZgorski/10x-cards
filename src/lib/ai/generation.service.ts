@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../db/database.types';
+import { createOpenRouterService, type ChatMessage, type JsonSchema } from './openrouter.service';
 
 // Types for the service
 interface GenerationPayload {
@@ -16,19 +17,7 @@ interface GenerationPayload {
   promptVersion?: string;
 }
 
-interface OpenRouterResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
-  model?: string;
-}
+// OpenRouterResponse interface removed - now using structured responses from OpenRouterService
 
 interface FlashcardSuggestion {
   front: string;
@@ -83,15 +72,17 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
       throw new Error(`Generation ${payload.generationId} not found`);
     }
 
-    // 3. Call OpenRouter API
-    const openRouterResponse = await callOpenRouter(
+    // 3. Call OpenRouter API with structured JSON response
+    const openRouterService = createOpenRouterService();
+    const { json, model, usage } = await callOpenRouterWithService(
+      openRouterService,
       generation.source_text,
-      payload.model || 'openai/gpt-3.5-turbo',
+      payload.model,
       payload.promptVersion || 'v1'
     );
 
     // 4. Parse and validate the AI response
-    const suggestions = parseOpenRouterResponse(openRouterResponse);
+    const suggestions = parseStructuredResponse(json);
 
     // 5. Bulk insert suggestions into ai_suggestions table
     await insertSuggestions(supabase, {
@@ -103,15 +94,15 @@ export async function runAIGeneration(payload: GenerationPayload): Promise<void>
     // 6. Update generation to 'succeeded' with metadata
     const endTime = Date.now();
     const metadata = {
-      model: openRouterResponse.model || payload.model,
+      model: model || payload.model,
       duration_ms: endTime - startTime,
       suggestions_count: suggestions.length,
       timestamp: new Date().toISOString(),
     };
 
     await updateGenerationSuccess(supabase, payload.generationId, {
-      tokens_input: openRouterResponse.usage?.prompt_tokens || null,
-      tokens_output: openRouterResponse.usage?.completion_tokens || null,
+      tokens_input: usage?.prompt_tokens || null,
+      tokens_output: usage?.completion_tokens || null,
       ai_metadata: metadata,
     });
 
@@ -200,132 +191,85 @@ async function getGeneration(
 }
 
 /**
- * Call OpenRouter API to generate flashcard suggestions
+ * Call OpenRouter API using the new service with structured JSON response
  */
-async function callOpenRouter(
+async function callOpenRouterWithService(
+  openRouterService: ReturnType<typeof createOpenRouterService>,
   sourceText: string,
-  model: string,
-  promptVersion: string
-): Promise<OpenRouterResponse> {
-  const openRouterApiKey = import.meta.env.OPENROUTER_API_KEY;
+  model?: string,
+  promptVersion: string = 'v1'
+): Promise<{ json: unknown; model?: string; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }> {
+  // Build messages
+  const systemMessage = openRouterService.buildSystemMessage(promptVersion);
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: sourceText },
+  ];
 
-  if (!openRouterApiKey) {
-    throw new Error('Missing OpenRouter API key configuration');
-  }
-
-  // Construct system prompt based on version
-  const systemPrompt = getSystemPrompt(promptVersion);
-  
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openRouterApiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://10x-cards.com', // Replace with actual domain
-      'X-Title': '10x Cards - Flashcard Generator',
+  // Define JSON schema for flashcard suggestions
+  const flashcardsSchema: JsonSchema = {
+    name: 'flashcards_schema',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['front', 'back'],
+        additionalProperties: false,
+        properties: {
+          front: { type: 'string', minLength: 1, maxLength: 2000 },
+          back: { type: 'string', minLength: 1, maxLength: 2000 },
+        },
+      },
+      minItems: 3,
+      maxItems: 20,
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: sourceText },
-      ],
+  };
+
+  // Call the service with structured response
+  return openRouterService.chatJson(messages, flashcardsSchema, {
+    model,
+    params: {
       temperature: 0.7,
       max_tokens: 2000,
-      stream: false,
-    }),
+      top_p: 0.9,
+    },
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
-  }
-
-  const data: OpenRouterResponse = await response.json();
-  
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error('No choices returned from OpenRouter API');
-  }
-
-  return data;
 }
 
-/**
- * Get system prompt based on version
- */
-function getSystemPrompt(version: string): string {
-  switch (version) {
-    case 'v1':
-    default:
-      return `You are an expert flashcard creator. Your task is to generate high-quality flashcard suggestions from the provided source text.
-
-Rules:
-1. Create 5-10 flashcards that cover the most important concepts
-2. Each flashcard should have a clear, concise question (front) and a complete answer (back)
-3. Questions should test understanding, not just memorization
-4. Keep fronts under 200 characters and backs under 500 characters
-5. Use simple, clear language
-6. Avoid yes/no questions unless they test important concepts
-
-Format your response as a JSON array of objects with "front" and "back" properties:
-[
-  {"front": "Question here?", "back": "Complete answer here"},
-  {"front": "Another question?", "back": "Another answer"}
-]
-
-Only return the JSON array, no additional text.`;
-  }
-}
+// getSystemPrompt function removed - now using OpenRouterService.buildSystemMessage()
 
 /**
- * Parse OpenRouter response and extract flashcard suggestions
+ * Parse structured JSON response from OpenRouter service
  */
-function parseOpenRouterResponse(response: OpenRouterResponse): FlashcardSuggestion[] {
-  const content = response.choices[0]?.message?.content;
-  
-  if (!content) {
-    throw new Error('No content in OpenRouter response');
+function parseStructuredResponse(json: unknown): FlashcardSuggestion[] {
+  if (!Array.isArray(json)) {
+    throw new Error('AI response is not an array');
   }
 
-  try {
-    // Try to extract JSON from the response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    const jsonString = jsonMatch ? jsonMatch[0] : content;
-    
-    const parsed = JSON.parse(jsonString);
-    
-    if (!Array.isArray(parsed)) {
-      throw new Error('Response is not an array');
-    }
+  // Validate and sanitize suggestions
+  const suggestions: FlashcardSuggestion[] = json
+    .filter((item): item is FlashcardSuggestion => {
+      return (
+        typeof item === 'object' &&
+        item !== null &&
+        typeof item.front === 'string' &&
+        typeof item.back === 'string' &&
+        item.front.length >= 1 &&
+        item.front.length <= 2000 &&
+        item.back.length >= 1 &&
+        item.back.length <= 2000
+      );
+    })
+    .map((item) => ({
+      front: item.front.trim(),
+      back: item.back.trim(),
+    }));
 
-    // Validate and sanitize suggestions
-    const suggestions: FlashcardSuggestion[] = parsed
-      .filter((item): item is FlashcardSuggestion => {
-        return (
-          typeof item === 'object' &&
-          item !== null &&
-          typeof item.front === 'string' &&
-          typeof item.back === 'string' &&
-          item.front.length >= 1 &&
-          item.front.length <= 2000 &&
-          item.back.length >= 1 &&
-          item.back.length <= 2000
-        );
-      })
-      .map((item) => ({
-        front: item.front.trim(),
-        back: item.back.trim(),
-      }));
-
-    if (suggestions.length === 0) {
-      throw new Error('No valid suggestions found in response');
-    }
-
-    return suggestions;
-  } catch (error) {
-    console.error('Failed to parse OpenRouter response:', { content, error });
-    throw new Error(`Failed to parse AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  if (suggestions.length === 0) {
+    throw new Error('No valid suggestions found in AI response');
   }
+
+  return suggestions;
 }
 
 /**

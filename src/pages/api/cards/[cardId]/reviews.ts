@@ -4,9 +4,8 @@
 
 import { z } from 'zod';
 import type { APIRoute } from 'astro';
-import type { CreateReviewCommand } from '../../../../types';
 import { createReview } from '../../../../lib/study.service';
-import { updateCardAfterReview } from '../../../../lib/flashcard.service';
+import type { CreateReviewCommand } from '../../../../types';
 
 // Zod schema for review creation
 const CreateReviewSchema = z.object({
@@ -74,23 +73,15 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
 
     const { rating, duration_ms } = validationResult.data;
 
-    // Create review
-    const review = await createReview(supabase, cardId, user.id, { rating, duration_ms });
-
-    // Update card SRS fields
-    const updatedCard = await updateCardAfterReview(supabase, cardId, user.id, rating);
-
-    const result = {
-      review,
-      card: updatedCard
-    };
+    // Create review and update card with SM-2
+    const result = await createReview(supabase, cardId, user.id, { rating, duration_ms });
 
     const duration = Date.now() - startTime;
     console.log('Review created successfully', { 
       requestId, 
       userId: user.id, 
       cardId,
-      reviewId: review.id,
+      reviewId: result.review.id,
       rating,
       duration 
     });

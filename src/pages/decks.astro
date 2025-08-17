@@ -1,0 +1,795 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Decki - 10x Cards" currentPage="decks">
+  <div class="decks-page">
+    <div class="page-header">
+      <h1 class="page-title">Twoje decki</h1>
+      <button id="new-deck-btn" class="btn btn-primary">
+        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Nowy deck
+      </button>
+    </div>
+    
+    <div class="decks-content">
+      <div class="decks-filters">
+        <div class="filters-row">
+          <input type="text" id="search-input" placeholder="Szukaj decki..." class="search-input">
+          <select id="archive-filter" class="filter-select">
+            <option value="false">Aktywne</option>
+            <option value="true">Zarchiwizowane</option>
+            <option value="">Wszystkie</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="decks-grid" id="decks-grid">
+        <div class="loading-state">
+          <div class="loading-spinner">
+            <svg class="spinner" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+              <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+            </svg>
+          </div>
+          <p>Ładowanie decki...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- New Deck Modal -->
+  <div class="modal-overlay hidden" id="new-deck-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Nowy deck</h2>
+        <button class="modal-close" id="close-modal">×</button>
+      </div>
+      
+      <form id="new-deck-form" class="modal-form">
+        <div class="form-group">
+          <label for="deck-name">Nazwa decka</label>
+          <input type="text" id="deck-name" name="name" required placeholder="np. Fizyka kwantowa">
+        </div>
+        
+        <div class="form-group">
+          <label for="deck-slug">Slug (opcjonalnie)</label>
+          <input type="text" id="deck-slug" name="slug" placeholder="fizyka-kwantowa">
+          <small class="form-hint">Zostaw puste, aby wygenerować automatycznie</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="language-code">Język (opcjonalnie)</label>
+          <select id="language-code" name="language_code">
+            <option value="">Wybierz język</option>
+            <option value="pl">Polski</option>
+            <option value="en">Angielski</option>
+            <option value="de">Niemiecki</option>
+            <option value="fr">Francuski</option>
+            <option value="es">Hiszpański</option>
+          </select>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-btn">Anuluj</button>
+          <button type="submit" class="btn btn-primary" id="create-btn">
+            <span class="btn-text">Utwórz deck</span>
+            <span class="btn-spinner hidden">
+              <svg class="spinner" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+                <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+        
+        <div class="form-message" id="form-message"></div>
+      </form>
+    </div>
+  </div>
+</AppLayout>
+
+<script>
+  class DecksManager {
+    constructor() {
+      this.init();
+    }
+    
+    private async init() {
+      await this.loadDecks();
+      this.setupEventListeners();
+    }
+    
+    private setupEventListeners() {
+      // New deck modal
+      document.getElementById('new-deck-btn')?.addEventListener('click', () => this.showNewDeckModal());
+      document.getElementById('close-modal')?.addEventListener('click', () => this.hideNewDeckModal());
+      document.getElementById('cancel-btn')?.addEventListener('click', () => this.hideNewDeckModal());
+      
+      // Form submission
+      document.getElementById('new-deck-form')?.addEventListener('submit', (e) => this.handleCreateDeck(e));
+      
+      // Auto-generate slug
+      const nameInput = document.getElementById('deck-name') as HTMLInputElement;
+      const slugInput = document.getElementById('deck-slug') as HTMLInputElement;
+      
+      nameInput?.addEventListener('input', () => {
+        if (!slugInput.value) {
+          slugInput.value = this.generateSlug(nameInput.value);
+        }
+      });
+      
+      // Search and filters
+      document.getElementById('search-input')?.addEventListener('input', () => this.filterDecks());
+      document.getElementById('archive-filter')?.addEventListener('change', () => this.filterDecks());
+      
+      // Close modal on overlay click
+      document.getElementById('new-deck-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+          this.hideNewDeckModal();
+        }
+      });
+    }
+    
+    private async loadDecks() {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        // Mock data for demo
+        const mockDecks = [
+          {
+            id: 'deck-1',
+            name: 'Fizyka kwantowa',
+            slug: 'fizyka-kwantowa',
+            language_code: 'pl',
+            is_archived: false,
+            cards_count: 25,
+            due_cards: 5,
+            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 'deck-2',
+            name: 'Historia Polski',
+            slug: 'historia-polski',
+            language_code: 'pl',
+            is_archived: false,
+            cards_count: 42,
+            due_cards: 12,
+            created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 'deck-3',
+            name: 'Programowanie JavaScript',
+            slug: 'programowanie-js',
+            language_code: 'pl',
+            is_archived: false,
+            cards_count: 38,
+            due_cards: 8,
+            created_at: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ];
+        
+        this.renderDecks(mockDecks);
+        
+      } catch (error) {
+        console.error('Error loading decks:', error);
+        this.showError('Błąd podczas ładowania decki');
+      }
+    }
+    
+    private renderDecks(decks: any[]) {
+      const grid = document.getElementById('decks-grid')!;
+      
+      if (decks.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>Brak decki</h3>
+            <p>Nie masz jeszcze żadnych decki. Utwórz pierwszego!</p>
+            <button class="btn btn-primary" onclick="document.getElementById('new-deck-btn').click()">
+              Utwórz pierwszy deck
+            </button>
+          </div>
+        `;
+        return;
+      }
+      
+      const html = decks.map(deck => `
+        <div class="deck-card" onclick="window.location.href='/decks/${deck.id}'">
+          <div class="deck-header">
+            <h3 class="deck-name">${deck.name}</h3>
+            <div class="deck-actions" onclick="event.stopPropagation()">
+              <button class="action-btn" onclick="this.closest('.deck-card').querySelector('.deck-menu').classList.toggle('hidden')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/>
+                </svg>
+              </button>
+              
+              <div class="deck-menu hidden">
+                <button onclick="editDeck('${deck.id}')">Edytuj</button>
+                <button onclick="archiveDeck('${deck.id}', ${!deck.is_archived})">${deck.is_archived ? 'Przywróć' : 'Archiwizuj'}</button>
+                <button onclick="deleteDeck('${deck.id}')" class="danger">Usuń</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="deck-stats">
+            <div class="stat">
+              <span class="stat-number">${deck.cards_count}</span>
+              <span class="stat-label">kart</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">${deck.due_cards}</span>
+              <span class="stat-label">do nauki</span>
+            </div>
+          </div>
+          
+          <div class="deck-meta">
+            <span class="deck-language">${this.getLanguageName(deck.language_code)}</span>
+            <span class="deck-date">Zaktualizowany ${this.formatDate(deck.updated_at)}</span>
+          </div>
+          
+          ${deck.is_archived ? '<div class="deck-archived">Zarchiwizowany</div>' : ''}
+        </div>
+      `).join('');
+      
+      grid.innerHTML = html;
+    }
+    
+    private showNewDeckModal() {
+      document.getElementById('new-deck-modal')?.classList.remove('hidden');
+      document.getElementById('deck-name')?.focus();
+    }
+    
+    private hideNewDeckModal() {
+      document.getElementById('new-deck-modal')?.classList.add('hidden');
+      this.resetForm();
+    }
+    
+    private async handleCreateDeck(e: Event) {
+      e.preventDefault();
+      
+      const form = e.target as HTMLFormElement;
+      const formData = new FormData(form);
+      
+      const createBtn = document.getElementById('create-btn') as HTMLButtonElement;
+      const btnText = createBtn.querySelector('.btn-text') as HTMLElement;
+      const btnSpinner = createBtn.querySelector('.btn-spinner') as HTMLElement;
+      const formMessage = document.getElementById('form-message') as HTMLElement;
+      
+      // Show loading state
+      createBtn.disabled = true;
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      formMessage.textContent = '';
+      formMessage.className = 'form-message';
+      
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) throw new Error('Brak autoryzacji');
+        
+        const deckData = {
+          name: formData.get('name'),
+          slug: formData.get('slug') || this.generateSlug(formData.get('name') as string),
+          language_code: formData.get('language_code') || null
+        };
+        
+        // In real app, call the API
+        // const response = await fetch('/api/decks', { ... });
+        
+        // Mock success
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        formMessage.textContent = 'Deck został utworzony pomyślnie!';
+        formMessage.className = 'form-message success';
+        
+        setTimeout(() => {
+          this.hideNewDeckModal();
+          this.loadDecks();
+        }, 1500);
+        
+      } catch (error) {
+        formMessage.textContent = error instanceof Error ? error.message : 'Wystąpił błąd';
+        formMessage.className = 'form-message error';
+      } finally {
+        createBtn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+      }
+    }
+    
+    private resetForm() {
+      const form = document.getElementById('new-deck-form') as HTMLFormElement;
+      form.reset();
+      
+      const formMessage = document.getElementById('form-message') as HTMLElement;
+      formMessage.textContent = '';
+      formMessage.className = 'form-message';
+    }
+    
+    private generateSlug(name: string): string {
+      return name
+        .toLowerCase()
+        .replace(/[^a-z0-9ąćęłńóśźż\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+    }
+    
+    private getLanguageName(code: string): string {
+      const languages: Record<string, string> = {
+        pl: 'Polski',
+        en: 'Angielski',
+        de: 'Niemiecki',
+        fr: 'Francuski',
+        es: 'Hiszpański'
+      };
+      return languages[code] || 'Nie określono';
+    }
+    
+    private formatDate(dateString: string): string {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return 'wczoraj';
+      if (diffDays < 7) return `${diffDays} dni temu`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} tygodni temu`;
+      
+      return date.toLocaleDateString('pl-PL');
+    }
+    
+    private filterDecks() {
+      // Implement filtering logic here
+      console.log('Filtering decks...');
+    }
+    
+    private showError(message: string) {
+      const grid = document.getElementById('decks-grid')!;
+      grid.innerHTML = `
+        <div class="error-state">
+          <p>${message}</p>
+          <button class="btn btn-primary" onclick="window.location.reload()">Spróbuj ponownie</button>
+        </div>
+      `;
+    }
+  }
+  
+  // Global functions for deck actions
+  window.editDeck = (deckId: string) => {
+    console.log('Edit deck:', deckId);
+  };
+  
+  window.archiveDeck = (deckId: string, archive: boolean) => {
+    const action = archive ? 'zarchiwizować' : 'przywrócić';
+    if (confirm(`Czy na pewno chcesz ${action} ten deck?`)) {
+      console.log('Archive deck:', deckId, archive);
+    }
+  };
+  
+  window.deleteDeck = (deckId: string) => {
+    if (confirm('Czy na pewno chcesz usunąć ten deck? Ta operacja jest nieodwracalna.')) {
+      console.log('Delete deck:', deckId);
+    }
+  };
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    new DecksManager();
+  });
+</script>
+
+<style>
+  .decks-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+  
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+  }
+  
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #2563eb;
+  }
+  
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+  
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+  
+  .btn-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .decks-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .decks-filters {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .search-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .filter-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    min-width: 150px;
+  }
+  
+  .decks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .deck-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  
+  .deck-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+  }
+  
+  .deck-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  
+  .deck-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    flex: 1;
+  }
+  
+  .deck-actions {
+    position: relative;
+  }
+  
+  .action-btn {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: #6b7280;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .action-btn:hover {
+    background: #f3f4f6;
+  }
+  
+  .action-btn svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .deck-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    min-width: 120px;
+  }
+  
+  .deck-menu button {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .deck-menu button:hover {
+    background: #f3f4f6;
+  }
+  
+  .deck-menu button.danger {
+    color: #dc2626;
+  }
+  
+  .deck-menu button.danger:hover {
+    background: #fef2f2;
+  }
+  
+  .deck-stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #3b82f6;
+  }
+  
+  .stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+  
+  .deck-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+  
+  .deck-archived {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #f59e0b;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .loading-state,
+  .empty-state,
+  .error-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+  
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .empty-state p {
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    animation: spin 1s linear infinite;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 0 1.5rem;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+  }
+  
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0.25rem;
+    line-height: 1;
+  }
+  
+  .modal-form {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-group label {
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .form-group input,
+  .form-group select {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+  
+  .form-message {
+    text-align: center;
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    min-height: 1.25rem;
+  }
+  
+  .form-message.success {
+    background: #ecfdf5;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+  }
+  
+  .form-message.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @media (max-width: 768px) {
+    .decks-page {
+      padding: 1rem;
+    }
+    
+    .page-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: stretch;
+    }
+    
+    .filters-row {
+      flex-direction: column;
+    }
+    
+    .decks-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .modal-actions {
+      flex-direction: column;
+    }
+  }
+</style>
+

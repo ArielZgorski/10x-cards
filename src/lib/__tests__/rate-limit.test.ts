@@ -2,7 +2,7 @@
  * Tests for Rate Limiting Helper
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ensureRateLimit, getRateLimitStatus } from '../rate-limit';
 
 describe('Rate Limiting', () => {

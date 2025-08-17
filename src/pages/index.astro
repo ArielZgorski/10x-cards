@@ -1,8 +1,184 @@
 ---
-import Welcome from "../components/Welcome.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout>
-  <Welcome />
+<Layout title="10x Cards">
+  <div class="landing-page">
+    <div class="hero-section">
+      <div class="hero-content">
+        <h1 class="hero-title">10x Cards</h1>
+        <p class="hero-description">
+          Generuj fiszki z pomocą AI i ucz się efektywniej dzięki algorytmom spaced repetition
+        </p>
+        <div class="hero-actions">
+          <a href="/register" class="btn btn-primary">Rozpocznij za darmo</a>
+          <a href="/login" class="btn btn-secondary">Mam już konto</a>
+        </div>
+      </div>
+      
+      <div class="hero-features">
+        <div class="feature-card">
+          <div class="feature-icon">🤖</div>
+          <h3>AI Generator</h3>
+          <p>Wklej tekst, a AI wygeneruje wysokiej jakości fiszki</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>Spaced Repetition</h3>
+          <p>Algorytm SM-2 optymalizuje Twój proces nauki</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Śledzenie postępów</h3>
+          <p>Monitoruj swoje wyniki i statystyki nauki</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </Layout>
+
+<script>
+  // Check if user is already logged in
+  document.addEventListener('DOMContentLoaded', () => {
+    const token = localStorage.getItem('supabase_token');
+    if (token) {
+      window.location.href = '/ai/generations';
+    }
+  });
+</script>
+
+<style>
+  .landing-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  
+  .hero-section {
+    max-width: 1200px;
+    width: 100%;
+    text-align: center;
+  }
+  
+  .hero-content {
+    margin-bottom: 4rem;
+  }
+  
+  .hero-title {
+    font-size: 4rem;
+    font-weight: 800;
+    color: white;
+    margin: 0 0 1rem 0;
+    text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .hero-description {
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 2rem 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .btn {
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+  }
+  
+  .btn-primary {
+    background: white;
+    color: #1f2937;
+  }
+  
+  .btn-primary:hover {
+    background: #f9fafb;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn-secondary {
+    background: transparent;
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: white;
+  }
+  
+  .hero-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 4rem;
+  }
+  
+  .feature-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 1rem;
+    padding: 2rem;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .feature-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .feature-card h3 {
+    color: white;
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .feature-card p {
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    line-height: 1.6;
+  }
+  
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 2.5rem;
+    }
+    
+    .hero-description {
+      font-size: 1.1rem;
+    }
+    
+    .hero-actions {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .btn {
+      width: 100%;
+      max-width: 300px;
+    }
+    
+    .hero-features {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

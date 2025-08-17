@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testowanie UI - Widok Generacji AI</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2d3748;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-grid {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-category {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #4299e1;
+        }
+        .test-category h3 {
+            color: #2d3748;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .test-links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .test-link {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #4299e1;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .test-link:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+        }
+        .test-link.success { background: #48bb78; }
+        .test-link.success:hover { background: #38a169; }
+        .test-link.warning { background: #ed8936; }
+        .test-link.warning:hover { background: #dd6b20; }
+        .test-link.error { background: #f56565; }
+        .test-link.error:hover { background: #e53e3e; }
+        .checklist {
+            background: #edf2f7;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .checklist h3 {
+            color: #2d3748;
+            margin-top: 0;
+        }
+        .checklist ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .checklist li {
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+        .status {
+            background: #bee3f8;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3182ce;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Testowanie UI - Widok Generacji AI</h1>
+        
+        <div class="status">
+            <strong>Status serwera:</strong> <span id="server-status">Sprawdzam...</span>
+        </div>
+
+        <div class="test-grid">
+            <div class="test-category">
+                <h3>📝 Podstawowe scenariusze</h3>
+                <div class="test-links">
+                    <a href="http://localhost:3001/ai/generations/test-generation-1" 
+                       class="test-link success" target="_blank">
+                        ✅ Generacja zakończona sukcesem
+                    </a>
+                    <a href="http://localhost:3001/ai/generations/test-generation-running" 
+                       class="test-link warning" target="_blank">
+                        🔄 Generacja w toku (polling demo)
+                    </a>
+                    <a href="http://localhost:3001/ai/generations/test-generation-failed" 
+                       class="test-link error" target="_blank">
+                        ❌ Generacja z błędem
+                    </a>
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>🎛️ Testowanie interakcji</h3>
+                <div class="test-links">
+                    <a href="http://localhost:3001/ai/generations/test-generation-1" 
+                       class="test-link" target="_blank">
+                        🎯 Test filtrowania statusów
+                    </a>
+                    <a href="http://localhost:3001/ai/generations/test-generation-1" 
+                       class="test-link" target="_blank">
+                        ☑️ Test selekcji wielu elementów
+                    </a>
+                    <a href="http://localhost:3001/ai/generations/test-generation-1" 
+                       class="test-link" target="_blank">
+                        📱 Test responsywności
+                    </a>
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>🏠 Nawigacja</h3>
+                <div class="test-links">
+                    <a href="http://localhost:3001" 
+                       class="test-link" target="_blank">
+                        🏠 Strona główna z linkami testowymi
+                    </a>
+                    <a href="http://localhost:3001/ai/generations/random-id-123" 
+                       class="test-link" target="_blank">
+                        🔗 Test z dowolnym ID
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="checklist">
+            <h3>📋 Lista kontrolna testowania UI</h3>
+            <ul>
+                <li><strong>Layout:</strong> Sprawdź breadcrumbs, nagłówek strony, sekcje</li>
+                <li><strong>StatusBanner:</strong> Różne statusy (succeeded, running, failed)</li>
+                <li><strong>GenerationMetaPanel:</strong> Wyświetlanie metadanych w karcie</li>
+                <li><strong>SuggestionsToolbar:</strong> 
+                    <ul>
+                        <li>Dropdown Select dla statusów (shadcn/ui)</li>
+                        <li>Licznik zaznaczonych elementów</li>
+                        <li>Przyciski masowe (aktywne/nieaktywne)</li>
+                    </ul>
+                </li>
+                <li><strong>SuggestionsList:</strong>
+                    <ul>
+                        <li>Checkbox selekcja</li>
+                        <li>Status badges w różnych kolorach</li>
+                        <li>Przyciski akcji (disabled dla accepted)</li>
+                        <li>Loading states ze Skeleton</li>
+                    </ul>
+                </li>
+                <li><strong>PaginationBar:</strong> Wyświetlanie dla większej liczby elementów</li>
+                <li><strong>Interakcje:</strong>
+                    <ul>
+                        <li>Filtrowanie po statusach</li>
+                        <li>Zaznaczanie/odznaczanie checkboxów</li>
+                        <li>Aktualizacja licznika zaznaczonych</li>
+                        <li>Console.log przy kliknięciu przycisków</li>
+                    </ul>
+                </li>
+                <li><strong>Loading states:</strong> Skeleton podczas ładowania</li>
+                <li><strong>Responsywność:</strong> Test na różnych rozmiarach ekranu</li>
+                <li><strong>Dark mode:</strong> Jeśli skonfigurowany</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Check server status
+        fetch('http://localhost:3001')
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('server-status').innerHTML = 
+                        '<span style="color: #38a169;">✅ Serwer działa na localhost:3000</span>';
+                } else {
+                    throw new Error('Server not responding');
+                }
+            })
+            .catch(() => {
+                document.getElementById('server-status').innerHTML = 
+                    '<span style="color: #e53e3e;">❌ Serwer nie działa. Uruchom: npm run dev</span>';
+            });
+    </script>
+</body>
+</html>

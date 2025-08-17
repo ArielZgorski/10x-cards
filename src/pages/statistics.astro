@@ -1,0 +1,659 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Statystyki - 10x Cards" currentPage="statistics">
+  <div class="statistics-page">
+    <div class="page-header">
+      <h1 class="page-title">Twoje statystyki</h1>
+      <p class="page-description">Śledź swoje postępy w nauce i generowaniu fiszek</p>
+    </div>
+    
+    <div class="stats-grid" id="stats-grid">
+      <div class="loading-state">
+        <div class="loading-spinner">
+          <svg class="spinner" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+            <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/>
+          </svg>
+        </div>
+        <p>Ładowanie statystyk...</p>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<script>
+  class StatisticsManager {
+    constructor() {
+      this.init();
+    }
+    
+    private async init() {
+      await this.loadStatistics();
+    }
+    
+    private async loadStatistics() {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) return;
+        
+        // Mock statistics data for demo
+        const stats = {
+          cards_total: 105,
+          cards_archived: 8,
+          cards_due: 25,
+          ai_generations_total: 12,
+          ai_suggestions_total: 84,
+          ai_suggestions_accepted: 67,
+          ai_acceptance_rate: 0.798,
+          reviews_total: 342,
+          last_reviewed_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours ago
+        };
+        
+        this.renderStatistics(stats);
+        
+      } catch (error) {
+        console.error('Error loading statistics:', error);
+        this.showError('Błąd podczas ładowania statystyk');
+      }
+    }
+    
+    private renderStatistics(stats: any) {
+      const grid = document.getElementById('stats-grid')!;
+      
+      const html = `
+        <!-- Cards Statistics -->
+        <div class="stats-section">
+          <h2 class="section-title">Fiszki</h2>
+          <div class="stats-cards">
+            <div class="stat-card primary">
+              <div class="stat-icon">📚</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.cards_total.toLocaleString()}</div>
+                <div class="stat-label">Wszystkie fiszki</div>
+              </div>
+            </div>
+            
+            <div class="stat-card blue">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.cards_due.toLocaleString()}</div>
+                <div class="stat-label">Do nauki dzisiaj</div>
+              </div>
+            </div>
+            
+            <div class="stat-card green">
+              <div class="stat-icon">✅</div>
+              <div class="stat-content">
+                <div class="stat-number">${(stats.cards_total - stats.cards_archived - stats.cards_due).toLocaleString()}</div>
+                <div class="stat-label">Nauczone</div>
+              </div>
+            </div>
+            
+            <div class="stat-card gray">
+              <div class="stat-icon">📦</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.cards_archived.toLocaleString()}</div>
+                <div class="stat-label">Zarchiwizowane</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI Statistics -->
+        <div class="stats-section">
+          <h2 class="section-title">Generowanie AI</h2>
+          <div class="stats-cards">
+            <div class="stat-card purple">
+              <div class="stat-icon">🤖</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.ai_generations_total.toLocaleString()}</div>
+                <div class="stat-label">Generacji AI</div>
+              </div>
+            </div>
+            
+            <div class="stat-card orange">
+              <div class="stat-icon">💡</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.ai_suggestions_total.toLocaleString()}</div>
+                <div class="stat-label">Sugestii wygenerowanych</div>
+              </div>
+            </div>
+            
+            <div class="stat-card green">
+              <div class="stat-icon">👍</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.ai_suggestions_accepted.toLocaleString()}</div>
+                <div class="stat-label">Sugestii zaakceptowanych</div>
+              </div>
+            </div>
+            
+            <div class="stat-card blue">
+              <div class="stat-icon">📊</div>
+              <div class="stat-content">
+                <div class="stat-number">${(stats.ai_acceptance_rate * 100).toFixed(1)}%</div>
+                <div class="stat-label">Wskaźnik akceptacji</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Learning Statistics -->
+        <div class="stats-section">
+          <h2 class="section-title">Nauka</h2>
+          <div class="stats-cards">
+            <div class="stat-card teal">
+              <div class="stat-icon">🎓</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.reviews_total.toLocaleString()}</div>
+                <div class="stat-label">Wszystkie powtórki</div>
+              </div>
+            </div>
+            
+            <div class="stat-card indigo">
+              <div class="stat-icon">⏰</div>
+              <div class="stat-content">
+                <div class="stat-number">${stats.last_reviewed_at ? this.getTimeAgo(stats.last_reviewed_at) : 'Nigdy'}</div>
+                <div class="stat-label">Ostatnia powtórka</div>
+              </div>
+            </div>
+            
+            <div class="stat-card pink">
+              <div class="stat-icon">🔥</div>
+              <div class="stat-content">
+                <div class="stat-number">${this.calculateStreak()}</div>
+                <div class="stat-label">Dni z rzędu</div>
+              </div>
+            </div>
+            
+            <div class="stat-card yellow">
+              <div class="stat-icon">⚡</div>
+              <div class="stat-content">
+                <div class="stat-number">${Math.round(stats.reviews_total / Math.max(1, stats.ai_generations_total))}</div>
+                <div class="stat-label">Średnio na generację</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Progress Charts -->
+        <div class="stats-section full-width">
+          <h2 class="section-title">Postępy w czasie</h2>
+          <div class="chart-container">
+            <div class="chart-placeholder">
+              <div class="chart-icon">📈</div>
+              <p>Wykresy postępów będą dostępne wkrótce</p>
+              <small>Funkcja w trakcie rozwoju</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Achievement Badges -->
+        <div class="stats-section full-width">
+          <h2 class="section-title">Osiągnięcia</h2>
+          <div class="achievements-grid">
+            ${this.renderAchievements(stats)}
+          </div>
+        </div>
+      `;
+      
+      grid.innerHTML = html;
+    }
+    
+    private getTimeAgo(dateString: string): string {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffHours < 1) return 'przed chwilą';
+      if (diffHours < 24) return `${diffHours}h temu`;
+      if (diffDays === 1) return 'wczoraj';
+      if (diffDays < 7) return `${diffDays} dni temu`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} tygodni temu`;
+      
+      return date.toLocaleDateString('pl-PL');
+    }
+    
+    private calculateStreak(): number {
+      // Mock calculation - in real app, this would be calculated from review history
+      return 7;
+    }
+    
+    private renderAchievements(stats: any): string {
+      const achievements = [
+        {
+          id: 'first_generation',
+          name: 'Pierwsza generacja',
+          description: 'Wygenerowano pierwszą fiszkę przez AI',
+          icon: '🎉',
+          earned: stats.ai_generations_total > 0,
+          progress: Math.min(1, stats.ai_generations_total),
+          target: 1
+        },
+        {
+          id: 'ai_master',
+          name: 'Mistrz AI',
+          description: 'Wygenerowano 10 generacji AI',
+          icon: '🤖',
+          earned: stats.ai_generations_total >= 10,
+          progress: Math.min(10, stats.ai_generations_total),
+          target: 10
+        },
+        {
+          id: 'review_champion',
+          name: 'Mistrz powtórek',
+          description: 'Wykonano 100 powtórek',
+          icon: '🏆',
+          earned: stats.reviews_total >= 100,
+          progress: Math.min(100, stats.reviews_total),
+          target: 100
+        },
+        {
+          id: 'quality_curator',
+          name: 'Kurator jakości',
+          description: 'Wskaźnik akceptacji AI > 80%',
+          icon: '✨',
+          earned: stats.ai_acceptance_rate > 0.8,
+          progress: Math.min(0.8, stats.ai_acceptance_rate),
+          target: 0.8
+        },
+        {
+          id: 'card_collector',
+          name: 'Kolekcjoner kart',
+          description: 'Zgromadzono 50 fiszek',
+          icon: '📚',
+          earned: stats.cards_total >= 50,
+          progress: Math.min(50, stats.cards_total),
+          target: 50
+        },
+        {
+          id: 'streak_hero',
+          name: 'Bohater serii',
+          description: 'Nauka przez 7 dni z rzędu',
+          icon: '🔥',
+          earned: this.calculateStreak() >= 7,
+          progress: Math.min(7, this.calculateStreak()),
+          target: 7
+        }
+      ];
+      
+      return achievements.map(achievement => `
+        <div class="achievement-card ${achievement.earned ? 'earned' : 'locked'}">
+          <div class="achievement-icon">${achievement.icon}</div>
+          <div class="achievement-content">
+            <h3 class="achievement-name">${achievement.name}</h3>
+            <p class="achievement-description">${achievement.description}</p>
+            <div class="achievement-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${(achievement.progress / achievement.target) * 100}%"></div>
+              </div>
+              <span class="progress-text">${achievement.progress}/${achievement.target}</span>
+            </div>
+          </div>
+          ${achievement.earned ? '<div class="earned-badge">✓</div>' : ''}
+        </div>
+      `).join('');
+    }
+    
+    private showError(message: string) {
+      const grid = document.getElementById('stats-grid')!;
+      grid.innerHTML = `
+        <div class="error-state">
+          <p>${message}</p>
+          <button class="btn btn-primary" onclick="window.location.reload()">Spróbuj ponownie</button>
+        </div>
+      `;
+    }
+  }
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    new StatisticsManager();
+  });
+</script>
+
+<style>
+  .statistics-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    margin-bottom: 2rem;
+  }
+  
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .page-description {
+    color: #6b7280;
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  
+  .stats-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .stats-section {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+  
+  .stats-section.full-width {
+    width: 100%;
+  }
+  
+  .section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+  }
+  
+  .stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+  
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid;
+    transition: transform 0.2s ease;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .stat-card.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+  }
+  
+  .stat-card.blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border-color: #3b82f6;
+    color: white;
+  }
+  
+  .stat-card.green {
+    background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+    border-color: #10b981;
+    color: white;
+  }
+  
+  .stat-card.gray {
+    background: linear-gradient(135deg, #6b7280 0%, #374151 100%);
+    border-color: #6b7280;
+    color: white;
+  }
+  
+  .stat-card.purple {
+    background: linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%);
+    border-color: #8b5cf6;
+    color: white;
+  }
+  
+  .stat-card.orange {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-color: #f59e0b;
+    color: white;
+  }
+  
+  .stat-card.teal {
+    background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+    border-color: #14b8a6;
+    color: white;
+  }
+  
+  .stat-card.indigo {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    border-color: #6366f1;
+    color: white;
+  }
+  
+  .stat-card.pink {
+    background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+    border-color: #ec4899;
+    color: white;
+  }
+  
+  .stat-card.yellow {
+    background: linear-gradient(135deg, #eab308 0%, #a16207 100%);
+    border-color: #eab308;
+    color: white;
+  }
+  
+  .stat-icon {
+    font-size: 2rem;
+    min-width: 2rem;
+  }
+  
+  .stat-content {
+    flex: 1;
+  }
+  
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    margin-top: 0.25rem;
+  }
+  
+  .chart-container {
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 3rem;
+    text-align: center;
+    border: 2px dashed #d1d5db;
+  }
+  
+  .chart-placeholder {
+    color: #6b7280;
+  }
+  
+  .chart-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .chart-placeholder p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .chart-placeholder small {
+    font-size: 0.875rem;
+  }
+  
+  .achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+  
+  .achievement-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    background: white;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  
+  .achievement-card.earned {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border-color: #10b981;
+  }
+  
+  .achievement-card.locked {
+    opacity: 0.6;
+  }
+  
+  .achievement-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  
+  .achievement-icon {
+    font-size: 2rem;
+    min-width: 2rem;
+  }
+  
+  .achievement-content {
+    flex: 1;
+  }
+  
+  .achievement-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+  }
+  
+  .achievement-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  .achievement-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .progress-bar {
+    flex: 1;
+    height: 0.5rem;
+    background: #e5e7eb;
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: #10b981;
+    transition: width 0.3s ease;
+  }
+  
+  .progress-text {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+    min-width: 3rem;
+  }
+  
+  .earned-badge {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    background: #10b981;
+    color: white;
+    border-radius: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 2px solid white;
+  }
+  
+  .loading-state,
+  .error-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+  
+  .spinner {
+    width: 2rem;
+    height: 2rem;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  
+  .btn {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #2563eb;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @media (max-width: 768px) {
+    .statistics-page {
+      padding: 1rem;
+    }
+    
+    .stats-cards {
+      grid-template-columns: 1fr;
+    }
+    
+    .achievements-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .stat-card {
+      flex-direction: column;
+      text-align: center;
+      gap: 0.5rem;
+    }
+    
+    .achievement-card {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .achievement-progress {
+      width: 100%;
+    }
+  }
+</style>
+

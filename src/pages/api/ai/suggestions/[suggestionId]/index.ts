@@ -1,9 +1,10 @@
 /**
- * PUT /api/ai/suggestions/[suggestionId] - Update a suggestion
+ * PUT /api/ai/suggestions/[suggestionId] - Update AI suggestion
  */
 
 import { z } from 'zod';
 import type { APIRoute } from 'astro';
+import type { UpdateAISuggestionCommand } from '../../../../../types';
 
 // Zod schema for suggestion updates
 const UpdateSuggestionSchema = z.object({
@@ -40,14 +41,9 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Parse and validate request body
-    let requestBody: unknown;
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      return createErrorResponse(400, 'Invalid JSON in request body');
-    }
-
-    const validationResult = UpdateSuggestionSchema.safeParse(requestBody);
+    const json = await request.json().catch(() => null);
+    const validationResult = UpdateSuggestionSchema.safeParse(json);
+    
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => 
         `${err.path.join('.')}: ${err.message}`
@@ -55,22 +51,44 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
       return createErrorResponse(400, `Validation error: ${errors}`);
     }
 
-    const updates = validationResult.data;
+    const updateData = validationResult.data;
+
+    // Check if suggestion exists and belongs to user
+    const { data: existingSuggestion, error: fetchError } = await supabase
+      .from('ai_suggestions')
+      .select('id, status, user_id')
+      .eq('id', suggestionId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !existingSuggestion) {
+      return createErrorResponse(404, 'Suggestion not found');
+    }
+
+    // Prevent editing accepted/rejected suggestions
+    if (existingSuggestion.status === 'accepted') {
+      return createErrorResponse(400, 'Cannot edit accepted suggestions');
+    }
 
     // Update suggestion
-    const { data, error } = await supabase
+    const { data: updatedSuggestion, error: updateError } = await supabase
       .from('ai_suggestions')
-      .update(updates)
+      .update({
+        ...updateData,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', suggestionId)
       .eq('user_id', user.id)
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return createErrorResponse(404, 'Suggestion not found');
-      }
-      throw new Error(`Failed to update suggestion: ${error.message}`);
+    if (updateError) {
+      console.error('Error updating suggestion', { 
+        requestId, 
+        suggestionId, 
+        error: updateError 
+      });
+      return createErrorResponse(500, 'Failed to update suggestion');
     }
 
     const duration = Date.now() - startTime;
@@ -81,7 +99,7 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
       duration 
     });
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(updatedSuggestion), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -110,11 +128,11 @@ function createErrorResponse(
   additionalHeaders: Record<string, string> = {}
 ): Response {
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       error: message,
       status,
       timestamp: new Date().toISOString(),
-    }), 
+    }),
     {
       status,
       headers: {

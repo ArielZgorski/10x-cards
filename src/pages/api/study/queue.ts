@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { APIRoute } from 'astro';
-import { getDueCards } from '../../../lib/flashcard.service';
+import { getStudyQueue } from '../../../lib/study.service';
 
 // Zod schema for query parameters
 const StudyQueueQuerySchema = z.object({
@@ -48,7 +48,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
     const { deck_id, limit } = validationResult.data;
 
     // Get due cards
-    const cards = await getDueCards(supabase, user.id, { deck_id, limit });
+    const cards = await getStudyQueue(supabase, user.id, { deck_id, limit });
 
     const duration = Date.now() - startTime;
     console.log('Study queue retrieved successfully', { 
